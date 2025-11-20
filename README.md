@@ -1,2 +1,9 @@
-# hnrnpu-causal-multiomics
-Causal Multi-Omics Network Inference in an HNRNPU Deletion Cell Model of Neurodevelopmental Disorder. HNRNPU del ASD NES male cell line D28 vs CTRL9 NES male D28
+# Causal multi-omics network inference in HNRNPU deletion cells
+
+This repository contains code and analysis to infer causal signaling and metabolic mechanisms from RNA-seq, proteomics, and metabolomics in HNRNPU deletion cell models using CARNIVAL and COSMOS.
+
+HNRNPUdel/+D28 vs CTRL9D28
+HNRNPUdel/+ = ASD
+Male NES cell lines
+
+
