@@ -49,3 +49,40 @@
 [2025-11-21 12:19:56] [TRACE]   [OmnipathR] Restricting interaction records to datasets: tf_mirna; and resources: CollecTRI
 [2025-11-21 12:19:56] [TRACE]   [OmnipathR] Filtering evidence columns: positive, negative, directed, undirected; to datasets: tf_mirna; and resources: CollecTRI; excluding resources: none
 [2025-11-21 12:19:56] [SUCCESS] [OmnipathR] Loaded 207 interactions from cache.
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] Processing args for OmniPath query
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] Arguments for OmniPath query: [query_type=interactions]
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] Organism(s): 9606
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] Orthology targets: 
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] Looking up in cache: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:18:51] [INFO]    [OmnipathR] Cache record does not exist: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] Looking up in cache: `http://no-tls.omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:18:51] [INFO]    [OmnipathR] Cache record does not exist: `http://no-tls.omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] Attempting `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:18:51] [INFO]    [OmnipathR] Retrieving URL: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] Attempt 1/3: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] HTTP request by `omnipath_curl`.
+[2025-11-24 13:18:51] [TRACE]   [OmnipathR] Curl options: [connecttimeout=10,timeout=300,debugfunction=<function>,verbose=FALSE,tcp_keepalive=TRUE,tcp_keepintvl=10,tcp_keepidle=10,tcp_keepcnt=13,upkeep_interval_ms=30000,ssl_verifypeer=1,ssl_verifyhost=2]
+[2025-11-24 13:18:52] [TRACE]   [OmnipathR] HTTP v1 GET: status 200.
+[2025-11-24 13:18:52] [TRACE]   [OmnipathR] Downloaded 31.7 Kb in 0.231495s from omnipathdb.org (136.8 Kb/s); Redirect: 0s, DNS look up: 0.006589s, Connection: 0.043168s, Pretransfer: 0.156113s, First byte at: 0.229967s
+[2025-11-24 13:18:52] [TRACE]   [OmnipathR] HTTP headers: HTTP/1.1 200 OK; Server: nginx; Date: Mon, 24 Nov 2025 13:18:53 GMT; Content-Type: text/plain; charset=utf-8; Transfer-Encoding: chunked; Connection: keep-alive; Cache-Control: max-age=3600; Access-Control-Allow-Origin: *; Expires: Mon, 24 Nov 2025 14:18:53 GMT; Cache-Control: public; X-Frame-Options: DENY; Content-Encoding: gzip
+[2025-11-24 13:18:58] [INFO]    [OmnipathR] Successfully retrieved: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:18:58] [TRACE]   [OmnipathR] Reading JSON from `C:\Users\diana\AppData\Local\cache\OmnipathR/cache.json` (encoding: UTF-8).
+[2025-11-24 13:18:58] [TRACE]   [OmnipathR] JSON validation successful: TRUE
+[2025-11-24 13:18:58] [TRACE]   [OmnipathR] Reading JSON from `C:\Users\diana\AppData\Local\cache\OmnipathR/cache.json` (encoding: UTF-8).
+[2025-11-24 13:18:58] [TRACE]   [OmnipathR] JSON validation successful: TRUE
+[2025-11-24 13:18:58] [INFO]    [OmnipathR] Cache item `a7b21d9d80a3837a50268df16d168128fc1c6ede` version 1: status changed from `unknown` to `started`.
+[2025-11-24 13:18:58] [TRACE]   [OmnipathR] Exporting object to RDS: `C:\Users\diana\AppData\Local\cache\OmnipathR/a7b21d9d80a3837a50268df16d168128fc1c6ede-1.rds`.
+[2025-11-24 13:18:59] [TRACE]   [OmnipathR] Exported RDS to `C:\Users\diana\AppData\Local\cache\OmnipathR/a7b21d9d80a3837a50268df16d168128fc1c6ede-1.rds`.
+[2025-11-24 13:18:59] [INFO]    [OmnipathR] Download ready [key=a7b21d9d80a3837a50268df16d168128fc1c6ede, version=1]
+[2025-11-24 13:18:59] [TRACE]   [OmnipathR] Reading JSON from `C:\Users\diana\AppData\Local\cache\OmnipathR/cache.json` (encoding: UTF-8).
+[2025-11-24 13:18:59] [TRACE]   [OmnipathR] JSON validation successful: TRUE
+[2025-11-24 13:18:59] [INFO]    [OmnipathR] Cache item `a7b21d9d80a3837a50268df16d168128fc1c6ede` version 1: status changed from `started` to `ready`.
+[2025-11-24 13:19:01] [SUCCESS] [OmnipathR] Downloaded 85217 interactions.
+[2025-11-24 13:43:11] [TRACE]   [OmnipathR] Processing args for OmniPath query
+[2025-11-24 13:43:11] [TRACE]   [OmnipathR] Arguments for OmniPath query: [query_type=interactions]
+[2025-11-24 13:43:12] [TRACE]   [OmnipathR] Organism(s): 9606
+[2025-11-24 13:43:12] [TRACE]   [OmnipathR] Orthology targets: 
+[2025-11-24 13:43:12] [TRACE]   [OmnipathR] Looking up in cache: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:43:12] [TRACE]   [OmnipathR] Loaded data from RDS `C:\Users\diana\AppData\Local\cache\OmnipathR/a7b21d9d80a3837a50268df16d168128fc1c6ede-1.rds`.
+[2025-11-24 13:43:12] [INFO]    [OmnipathR] Loaded from cache: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 13:43:14] [SUCCESS] [OmnipathR] Loaded 85217 interactions from cache.

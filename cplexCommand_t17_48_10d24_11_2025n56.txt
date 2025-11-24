@@ -1,0 +1,14 @@
+read C:/Users/diana/Documents/Masters/RP2 Tammimies/hnrnpu-causal-multiomics/lpFile_t17_48_10d24_11_2025n56.lp
+set mip tolerances mipgap 0
+set mip pool relgap 0
+set mip pool replace 2
+set mip limits populate 500
+set mip pool capacity 100
+set mip pool intensity 4
+set timelimit 7200
+set threads 0
+set output clonelog -1
+set workdir C:/Users/diana/Documents/Masters/RP2 Tammimies/hnrnpu-causal-multiomics
+populate
+write C:/Users/diana/Documents/Masters/RP2 Tammimies/hnrnpu-causal-multiomics/result_t17_48_10d24_11_2025n56.txt sol all
+quit

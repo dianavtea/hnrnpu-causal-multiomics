@@ -8,6 +8,9 @@ library(tidyr)
 library(ggplot2)
 library(pheatmap)
 library(ggrepel)
+library(progeny)
+library(dorothea)
+library(readr)
 
 ##### transcriptutorial decoupleR, ULM, collecTRI #####
 
@@ -198,12 +201,209 @@ ggsave(
   dpi = 300
 )
 
+##### transcriptutorial with DOROTHEA 24.11.2025 #####
+## We load Dorothea Regulons
+data(dorothea_hs, package = "dorothea")
+regulons <- dorothea_hs %>%
+  dplyr::filter(confidence %in% c("A", "B","C"))
+
+tf_activities_stat <- dorothea::run_viper(degstat_mat, regulons,
+                                          options =  list(minsize = 5, eset.filter = FALSE, 
+                                                          cores = 1, verbose = FALSE, nes = TRUE))
+tf_activities_stat_top25 <- tf_activities_stat %>%
+  as.data.frame() %>% 
+  rownames_to_column(var = "GeneID") %>%
+  dplyr::rename(NES = "statistic") %>%
+  dplyr::top_n(25, wt = abs(NES)) %>%
+  dplyr::arrange(NES) %>% 
+  dplyr::mutate(GeneID = factor(GeneID))
+
+tftop25 <- ggplot(tf_activities_stat_top25,aes(x = reorder(GeneID, NES), y = NES)) + 
+  geom_bar(aes(fill = NES), stat = "identity") +
+  scale_fill_gradient2(low = "darkblue", high = "indianred", 
+                       mid = "whitesmoke", midpoint = 0) + 
+  theme_minimal() +
+  theme(axis.title = element_text(face = "bold", size = 12),
+        axis.text.x = 
+          element_text(angle = 45, hjust = 1, size =10, face= "bold"),
+        axis.text.y = element_text(size =10, face= "bold"),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank()) +
+  xlab("Transcription Factors")
+ggsave(
+  filename = "TFtop25_NES_dorothea.png",
+  plot = tftop25,
+  width = 10,
+  height = 8,
+  dpi = 300
+)
+
+targets_SP1 <- regulons$target[regulons$tf == "SP1"]
+SP1 <- volcano_nice(as.data.frame(DEG_allstats[DEG_allstats$ID %in% targets_SP1,]), 
+             FCIndex = 3, pValIndex = 4, IDIndex = 1,nlabels = 20, label = TRUE, 
+             straight = FALSE) 
+ggsave(
+  filename = "SP1_dorothea.png",
+  plot = SP1,
+  width = 8,
+  height = 12,
+  dpi = 300
+)
+
+targets_NANOG <- regulons$target[regulons$tf == "NANOG"]
+NANOG <- volcano_nice(as.data.frame(DEG_allstats[DEG_allstats$ID %in% targets_NANOG,]), 
+                    FCIndex = 3, pValIndex = 4, IDIndex = 1,nlabels = 20, label = TRUE, 
+                    straight = FALSE) 
+
+tf_activities_CARNIVALinput<- tf_activities_stat %>%
+  as.data.frame() %>% 
+  tibble::rownames_to_column(var = "TF") 
+write.csv(tf_activities_CARNIVALinput, "tf_activities_CARNIVALinput.csv")
+
+#tf activities per sample
+tf_activities_counts <- 
+  dorothea::run_viper(vst_progeny, regulons,
+                      options =  list(minsize = 5, eset.filter = FALSE, 
+                                      cores = 1, verbose = FALSE, method = c("scale")))
+
+tf_activities_counts_filter <- tf_activities_counts %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "GeneID") %>%
+  dplyr::filter(GeneID %in% tf_activities_stat_top25$GeneID) %>%
+  column_to_rownames(var = "GeneID") %>%
+  as.matrix()
+tf_activities_vector <- as.vector(tf_activities_counts_filter)
+
+paletteLength <- 100
+myColor <- 
+  colorRampPalette(c("darkblue", "whitesmoke","indianred"))(paletteLength)
+
+dorotheaBreaks <- c(seq(min(tf_activities_vector), 0, 
+                        length.out=ceiling(paletteLength/2) + 1),
+                    seq(max(tf_activities_vector)/paletteLength, 
+                        max(tf_activities_vector), 
+                        length.out=floor(paletteLength/2)))
+dorothea_hmap <- pheatmap(tf_activities_counts_filter,
+                          fontsize=14, fontsize_row = 8, fontsize_col = 8, 
+                          color=myColor, breaks = dorotheaBreaks,
+                          main = "Dorothea ABC", angle_col = 45,
+                          treeheight_col = 0,  border_color = NA)
+ggsave(
+  filename = "hmap_dorothea.png",
+  plot = dorothea_hmap,
+  width = 8,
+  height = 10,
+  dpi = 300
+)
 ##### most important outputs here #####
 net
 sample_acts
 contrast_acts
+tf_activities_CARNIVALinput
 
 #visualisation
 top25_heatmap
 p #barplot DEG ASD vs CTRL TFs
 p1 #volcano plot SP1
+tftop25
+SP1
+dorothea_hmap
+
+
+##### support code #####
+volcano_nice <- function (df, hAss = 0.05, FCIndex, pValIndex, IDIndex, vAss = NULL,
+                          label = FALSE, straight = FALSE, nlabels, manual_labels = NA)
+{
+  df <- df[complete.cases(df), ]
+  names(df)[1] <- "X1"
+  hAssOri <- hAss
+  hAss <- -log(hAss)
+  names(df) <- gsub("adj.P.Val", "FDR", names(df))
+  names(df)[FCIndex] <- "logFC"
+  names(df)[pValIndex] <- "adj.P.Val"
+  if (max(abs(df[, FCIndex])) >= 1) {
+    xlimAbs <- ceiling(max(abs(df[, FCIndex])))
+    ylimAbs <- ceiling(max(abs(-log(df[, pValIndex]))))
+  }
+  else {
+    xlimAbs <- max(abs(df[, FCIndex]))
+    ylimAbs <- max(abs(-log(df[, pValIndex])))
+  }
+  if (is.null(vAss)) {
+    vAss <- xlimAbs/10
+  }
+  xneg <- function(x) abs(hAss - 1 + x/(x + vAss))
+  xpos <- function(x) abs(hAss - 1 + x/(x - vAss))
+  test <- function(x, y, vAss) {
+    if (x < -vAss) {
+      if (xneg(x) < -log(y)) {
+        return("1")
+      }
+      else {
+        return("0")
+      }
+    }
+    else {
+      if (x > vAss) {
+        if (xpos(x) < -log(y)) {
+          return("1")
+        }
+        else {
+          return("0")
+        }
+      }
+      else {
+        return("0")
+      }
+    }
+  }
+  if (straight) {
+    df$couleur <- ifelse(abs(df$logFC) >= vAss & df$adj.P.Val <=
+                           hAssOri, "1", "0")
+  }
+  else {
+    df$couleur <- "0"
+    df$couleur <- apply(df, 1, FUN = function(x) test(as.numeric(x[FCIndex]),
+                                                      as.numeric(x[pValIndex]), vAss))
+  }
+  df <- df[order(df$adj.P.Val, decreasing = F), ]
+  df$condLabel <- df[, IDIndex]
+  df[df$couleur == "0", "condLabel"] <- NA
+  labels_to_keep <- c(df[c(1:nlabels), "condLabel"],manual_labels)
+  df[!(df$condLabel %in% labels_to_keep), "condLabel"] <- NA
+  df$couleur <- ifelse(df$couleur == "1" & df$logFC < 0, "2",
+                       df$couleur)
+  if (label) {
+    a <- ggplot(df, aes(x = logFC, y = -log(adj.P.Val), color = couleur)) +
+      geom_point(alpha = 0.5) + geom_label_repel(aes(label = condLabel)) +
+      stat_function(fun = xneg, xlim = c(-xlimAbs, -vAss),
+                    color = "black", alpha = 0.7) + ylim(c(0, ylimAbs)) +
+      xlim(c(-xlimAbs, xlimAbs)) + stat_function(fun = xpos,
+                                                 xlim = c(vAss, xlimAbs), color = "black", alpha = 0.7) +
+      scale_colour_manual(values = c("grey30", "red",
+                                     "royalblue3")) + theme_minimal() + theme(legend.position = "none")
+  }
+  else {
+    if (straight) {
+      a <- ggplot(df, aes(x = logFC, y = -log(adj.P.Val),
+                          color = couleur)) + geom_point(alpha = 0.5) +
+        geom_vline(xintercept = -vAss, color = "blue") +
+        geom_vline(xintercept = vAss, color = "blue") +
+        ylim(c(0, ylimAbs)) + xlim(c(-xlimAbs, xlimAbs)) +
+        geom_hline(yintercept = hAss, color = "red") +
+        scale_colour_manual(values = c("grey30", "red",
+                                       "royalblue3")) + theme_minimal() + theme(legend.position = "none")
+    }
+    else {
+      a <- ggplot(df, aes(x = logFC, y = -log(adj.P.Val),
+                          color = couleur)) + geom_point(alpha = 0.5) +
+        stat_function(fun = xneg, xlim = c(-xlimAbs,
+                                           -vAss), color = "black", alpha = 0.7) + ylim(c(0,
+                                                                                          ylimAbs)) + xlim(c(-xlimAbs, xlimAbs)) + stat_function(fun = xpos,
+                                                                                                                                                 xlim = c(vAss, xlimAbs), color = "black", alpha = 0.7) +
+        scale_colour_manual(values = c("grey30", "red",
+                                       "royalblue3")) + theme_minimal() + theme(legend.position = "none")
+    }
+  }
+  return(a)
+}
