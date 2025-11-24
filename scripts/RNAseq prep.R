@@ -19,8 +19,8 @@ rm(list=ls())
 
 ##### DESeq2 #####
 # read data
-cr <- read.delim("~/Masters/RP2 Tammimies/hnrnpu-causal-multiomics/rawdata/merged_gene_counts 1.txt", header=TRUE, stringsAsFactors = FALSE,row.names=1)
-md <- read.delim("~/Masters/RP2 Tammimies/hnrnpu-causal-multiomics/rawdata/columndata 1.txt", header=TRUE, sep="\t", row.names = 1,stringsAsFactors = FALSE)
+cr <- read.delim("~/Masters/RP2/hnrnpu-causal-multiomics/rawdata/merged_gene_counts 1.txt", header=TRUE, stringsAsFactors = FALSE,row.names=1)
+md <- read.delim("~/Masters/RP2/hnrnpu-causal-multiomics/rawdata/columndata 1.txt", header=TRUE, sep="\t", row.names = 1,stringsAsFactors = FALSE)
 #check that col names of cr are the same as raw names in md
 all.equal(colnames(cr),rownames(md))
 
@@ -123,7 +123,7 @@ write.csv(vst_progeny, "VST_progeny.csv", row.names = TRUE)
 
 ##### prep for infer TF activities (ID and stat) #####
 #open file which is currently excel format
-DEG_ASD12D28_vs_CTRL9D28 <- read_excel("~/Masters/RP2 Tammimies/hnrnpu-causal-multiomics/rawdata/bulkRNAseq/DEG_ASD12D28_vs_CTRL9D28 .xlsx")
+DEG_ASD12D28_vs_CTRL9D28 <- read_excel("~/Masters/RP2/hnrnpu-causal-multiomics/rawdata/bulkRNAseq/DEG_ASD12D28_vs_CTRL9D28 .xlsx")
 View(DEG_ASD12D28_vs_CTRL9D28)
 
 #clean file w symbol, stat, logFC and padj (filtered later)

@@ -18,19 +18,14 @@ library(ggrepel)
 library(rcbc)
 system("cbc")
 
-if (!require(remotes))
-  install.packages("remotes")
-remotes::install_github("dirkschumacher/rcbc")
-library(rcbc)
-
 ## We also load the support functions
 source("assignPROGENyScores.r")
 source("generateTFList.r")
 source("carnival_visNetwork.r")
 
 ## We read the normalised counts and the experimental design 
-tf_activities <- read_csv("~/Masters/RP2 Tammimies/hnrnpu-causal-multiomics/processeddata/tf_activities_CARNIVALinput.csv")
-PathwayActivity <- read_csv("~/Masters/RP2 Tammimies/hnrnpu-causal-multiomics/processeddata/PathwayActivity_CARNIVALinput.csv")
+tf_activities <- read_csv("~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/tf_activities_CARNIVALinput.csv")
+PathwayActivity <- read_csv("~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/PathwayActivity_CARNIVALinput.csv")
 
 #create or upload scaffold network w omnipath
 # need sif table format (node1, interaction, node2)
@@ -64,7 +59,7 @@ sif$source <- gsub(":", "_", sif$source)
 sif$target <- gsub(":", "_", sif$target)
 
 #save SIF
-write_tsv(sif, "~/Masters/RP2 Tammimies/hnrnpu-causal-multiomics/processeddata/omnipath_carnival.tsv")
+write_tsv(sif, "~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/omnipath_carnival.tsv")
 
 #tf and pathway activities CARNIVAL
 #We use the supplementary functions generateTFList.r and assignPROGENyScores.r to 
@@ -112,7 +107,7 @@ colnames(iniciators) = iniMTX
 
 # run carnival
 carnival_result = runCARNIVAL(inputObj= iniciators,
-                               measObj = tfList$t, 
+                               measObj = measVec, 
                                netObj = sif, 
                                weightObj = progenylist$score, 
                                solverPath = "~/IBM/ILOG/CPLEX_Studio_Community2212/cplex", 
@@ -120,24 +115,22 @@ carnival_result = runCARNIVAL(inputObj= iniciators,
                                timelimit=7200,
                                mipGAP=0,
                                poolrelGAP=0 )
-head(tfList)
+
 
 # If you used top=50 and access_idx = 1
 tf_df <- tfList[[1]]              # first element of the list
 measVec <- as.numeric(tf_df[1, ]) # extract numeric values
 names(measVec) <- colnames(tf_df) # TF names
 
-# Now use in CARNIVAL - DID NOT WORK
-carnival_result <- runCARNIVAL(
-  inputObj = iniciators,
-  measObj = measVec,
-  netObj = sif,
-  weightObj = progenylist$score,
-  solverPath = "C:/Program Files/IBM/ILOG/CPLEX_Studio_Community2212/cplex/bin/x64_win64/cplex.exe",
-  solver = "cplex",
-  timelimit=7200,
-  mipGAP=0,
-  poolrelGAP=0 )
+carnival_result = runCARNIVAL(inputObj= iniciators,
+                              measObj = measVec, 
+                              netObj = sif, 
+                              weightObj = progenylist$score, 
+                              solverPath = "C:/Cbc/bin/cbc.exe", 
+                              solver = "cbc",
+                              timelimit=7200,
+                              mipGAP=0,
+                              poolrelGAP=0)
 
 #DID NOT WORK
 carnival_result <- runCARNIVAL(
@@ -162,7 +155,7 @@ carnival_result$nodesAttributes$UpAct <- as.numeric(carnival_result$nodesAttribu
 carnival_result$nodesAttributes$DownAct <- as.numeric(carnival_result$nodesAttributes$DownAct)
 carnival_result$nodesAttributes$AvgAct <- as.numeric(carnival_result$nodesAttributes$AvgAct)
 
-saveRDS(carnival_result,"../results/carnival_result.rds")
+saveRDS(carnival_result,"~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/carnival_result.rds")
 
 # visualization
 visNet = carnival_visNet(evis = carnival_result$weightedSIF,
@@ -170,3 +163,34 @@ visNet = carnival_visNet(evis = carnival_result$weightedSIF,
 #visNet
 visSave(visNet, file = paste0('carnival_visualization_visNetwork.html'), selfcontained = TRUE)
 
+##### analysis of CARNIVAL results #####
+library(readr)
+library(piano)
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(tidyr)
+library(dplyr)
+library(scales)
+library(plyr)
+library(GSEABase)
+library(network)
+library(reshape2)
+library(cowplot)
+library(pheatmap)
+library(ggraph)
+library(tidygraph)
+
+
+## We also load the support functions
+source("support_enrichment.r")
+source("support_networks.r")
+
+## and the data
+
+#read CARNIVAL results
+carnival_result = readRDS("~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/carnival_result.rds")
+
+
+
+pkn = read_tsv("../results/omnipath_carnival.tsv")

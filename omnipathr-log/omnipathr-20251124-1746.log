@@ -56,3 +56,11 @@
 [2025-11-24 17:47:14] [TRACE]   [OmnipathR] Loaded data from RDS `C:\Users\diana\AppData\Local\cache\OmnipathR/a7b21d9d80a3837a50268df16d168128fc1c6ede-1.rds`.
 [2025-11-24 17:47:14] [INFO]    [OmnipathR] Loaded from cache: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
 [2025-11-24 17:47:18] [SUCCESS] [OmnipathR] Loaded 85217 interactions from cache.
+[2025-11-24 19:46:57] [TRACE]   [OmnipathR] Processing args for OmniPath query
+[2025-11-24 19:46:57] [TRACE]   [OmnipathR] Arguments for OmniPath query: [query_type=interactions]
+[2025-11-24 19:46:57] [TRACE]   [OmnipathR] Organism(s): 9606
+[2025-11-24 19:46:57] [TRACE]   [OmnipathR] Orthology targets: 
+[2025-11-24 19:46:57] [TRACE]   [OmnipathR] Looking up in cache: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 19:46:58] [TRACE]   [OmnipathR] Loaded data from RDS `C:\Users\diana\AppData\Local\cache\OmnipathR/a7b21d9d80a3837a50268df16d168128fc1c6ede-1.rds`.
+[2025-11-24 19:46:58] [INFO]    [OmnipathR] Loaded from cache: `https://omnipathdb.org/interactions?genesymbols=yes&datasets=omnipath&organisms=9606&fields=sources,references,curation_effort&license=academic`
+[2025-11-24 19:47:02] [SUCCESS] [OmnipathR] Loaded 85217 interactions from cache.
