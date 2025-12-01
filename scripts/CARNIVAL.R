@@ -2,6 +2,10 @@
 ##### CARNIVAL transcriptutorial non-adapted or modified TEST! #####
 #network reconstruction
 source("support_functions.R")
+BiocManager::install("CARNIVAL")
+if (!require(remotes))
+  install.packages("remotes")
+remotes::install_github("dirkschumacher/rcbc")
 
 library(progeny)
 library(dorothea)
@@ -16,7 +20,11 @@ library(ggplot2)
 library(pheatmap)
 library(ggrepel)
 library(rcbc)
-system("cbc")
+Sys.setenv(CBC_HOME = "C:/Users/diana/Downloads/Cbc-releases.2.10.12-windows-2022-msvs-v17-Release-x64/bin/cbc.exe") 
+Sys.setenv(PATH = paste(Sys.getenv("PATH"), "C:/Users/diana/Downloads/Cbc-releases.2.10.12-windows-2022-msvs-v17-Release-x64/bin/cbc.exe", sep=";"))
+Sys.getenv("CBC_HOME")
+ls("package:rcbc")
+
 
 ## We also load the support functions
 source("assignPROGENyScores.r")
@@ -24,8 +32,8 @@ source("generateTFList.r")
 source("carnival_visNetwork.r")
 
 ## We read the normalised counts and the experimental design 
-tf_activities <- read_csv("~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/tf_activities_CARNIVALinput.csv")
-PathwayActivity <- read_csv("~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/PathwayActivity_CARNIVALinput.csv")
+tf_activities <- read_csv("~/hnrnpu-causal-multiomics/processeddata/tf_activities_CARNIVALinput.csv")
+PathwayActivity <- read_csv("~/hnrnpu-causal-multiomics/processeddata/PathwayActivity_CARNIVALinput.csv")
 
 #create or upload scaffold network w omnipath
 # need sif table format (node1, interaction, node2)
@@ -105,18 +113,6 @@ iniMTX = base::setdiff(sif$source, sif$target)
 iniciators = base::data.frame(base::matrix(data = NaN, nrow = 1, ncol = length(iniMTX)), stringsAsFactors = F)
 colnames(iniciators) = iniMTX
 
-# run carnival
-carnival_result = runCARNIVAL(inputObj= iniciators,
-                               measObj = measVec, 
-                               netObj = sif, 
-                               weightObj = progenylist$score, 
-                               solverPath = "~/IBM/ILOG/CPLEX_Studio_Community2212/cplex", 
-                               solver = "cplex",
-                               timelimit=7200,
-                               mipGAP=0,
-                               poolrelGAP=0 )
-
-
 # If you used top=50 and access_idx = 1
 tf_df <- tfList[[1]]              # first element of the list
 measVec <- as.numeric(tf_df[1, ]) # extract numeric values
@@ -126,25 +122,16 @@ carnival_result = runCARNIVAL(inputObj= iniciators,
                               measObj = measVec, 
                               netObj = sif, 
                               weightObj = progenylist$score, 
-                              solverPath = "C:/Cbc/bin/cbc.exe", 
+                              solverPath = "C:/Users/diana/Downloads/Cbc-releases.2.10.12-windows-2022-msvs-v17-Release-x64/bin/cbc.exe", 
                               solver = "cbc",
                               timelimit=7200,
                               mipGAP=0,
                               poolrelGAP=0)
 
-#DID NOT WORK
-carnival_result <- runCARNIVAL(
-  inputObj = iniciators,
-  measObj = measVec,
-  netObj = sif,
-  weightObj = progenylist$score,
-  solver = "cbc",
-  timelimit=7200,
-  mipGAP=0,
-  poolrelGAP=0 )
 
-#if figure out above visualisation:
-#transoform to data.frame
+
+
+#transform to data.frame
 carnival_result$weightedSIF <- data.frame(carnival_result$weightedSIF, stringsAsFactors = F)
 carnival_result$weightedSIF$Sign <- as.numeric(carnival_result$weightedSIF$Sign)
 carnival_result$weightedSIF$Weight <- as.numeric(carnival_result$weightedSIF$Weight)
@@ -155,7 +142,7 @@ carnival_result$nodesAttributes$UpAct <- as.numeric(carnival_result$nodesAttribu
 carnival_result$nodesAttributes$DownAct <- as.numeric(carnival_result$nodesAttributes$DownAct)
 carnival_result$nodesAttributes$AvgAct <- as.numeric(carnival_result$nodesAttributes$AvgAct)
 
-saveRDS(carnival_result,"~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/carnival_result.rds")
+saveRDS(carnival_result,"~/hnrnpu-causal-multiomics/processeddata/carnival_result.rds")
 
 # visualization
 visNet = carnival_visNet(evis = carnival_result$weightedSIF,
@@ -164,6 +151,8 @@ visNet = carnival_visNet(evis = carnival_result$weightedSIF,
 visSave(visNet, file = paste0('carnival_visualization_visNetwork.html'), selfcontained = TRUE)
 
 ##### analysis of CARNIVAL results #####
+BiocManager::install("piano")
+BiocManager::install("GSEABase")
 library(readr)
 library(piano)
 library(dplyr)
@@ -189,8 +178,5 @@ source("support_networks.r")
 ## and the data
 
 #read CARNIVAL results
-carnival_result = readRDS("~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/carnival_result.rds")
-
-
-
-pkn = read_tsv("../results/omnipath_carnival.tsv")
+carnival_result = readRDS("~/hnrnpu-causal-multiomics/processeddata/carnival_result.rds")
+pkn = read_tsv("~/hnrnpu-causal-multiomics/processeddata/omnipath_carnival.tsv")

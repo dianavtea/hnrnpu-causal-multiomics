@@ -1,6 +1,8 @@
 ##### 21.11.2025 #####
 
 ##### packages #####
+BiocManager::install("OmnipathR")
+BiocManager::install("viper")
 library(decoupleR)
 library(dplyr)
 library(tibble)
@@ -11,6 +13,8 @@ library(ggrepel)
 library(progeny)
 library(dorothea)
 library(readr)
+library(OmnipathR)
+library(viper)
 
 ##### transcriptutorial decoupleR, ULM, collecTRI #####
 

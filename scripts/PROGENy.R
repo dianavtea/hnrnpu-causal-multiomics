@@ -1,5 +1,8 @@
 ##### 21.11.2025 #####
 ##### library installation #####
+BiocManager::install("decoupleR")
+BiocManager::install("progeny")
+BiocManager::install("dorothea")
 library(Biobase)
 library(stats)
 library(dplyr)
