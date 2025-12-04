@@ -1,12 +1,6 @@
-##### 24.11.2025 #####
-##### CARNIVAL transcriptutorial non-adapted or modified TEST! #####
-#network reconstruction
-source("support_functions.R")
-BiocManager::install("CARNIVAL")
-if (!require(remotes))
-  install.packages("remotes")
-remotes::install_github("dirkschumacher/rcbc")
 
+
+##### CARNIVAL transcriptutorial filtered set #####
 library(progeny)
 library(dorothea)
 library(CARNIVAL)
@@ -18,27 +12,20 @@ library(dplyr)
 library(visNetwork)
 library(ggplot2)
 library(pheatmap)
+## For the volcano plot (related to support functions)
 library(ggrepel)
-library(rcbc)
-Sys.setenv(CBC_HOME = "C:/Users/diana/Downloads/Cbc-releases.2.10.12-windows-2022-msvs-v17-Release-x64/bin/cbc.exe") 
-Sys.setenv(PATH = paste(Sys.getenv("PATH"), "C:/Users/diana/Downloads/Cbc-releases.2.10.12-windows-2022-msvs-v17-Release-x64/bin/cbc.exe", sep=";"))
-Sys.getenv("CBC_HOME")
-ls("package:rcbc")
 
-
-## We also load the support functions
 source("assignPROGENyScores.r")
 source("generateTFList.r")
 source("carnival_visNetwork.r")
 
-## We read the normalised counts and the experimental design 
-tf_activities <- read_csv("~/hnrnpu-causal-multiomics/processeddata/tf_activities_CARNIVALinput.csv")
-PathwayActivity <- read_csv("~/hnrnpu-causal-multiomics/processeddata/PathwayActivity_CARNIVALinput.csv")
+tf_activitiesf <- read_csv("~/hnrnpu-causal-multiomics/processeddata/TFActivity_CARNIVALinputf.csv")
+#656 rows/TFs, 2 col (TF and score)
+head(tf_activitiesf)
+PathwayActivity <- read_csv("~/hnrnpu-causal-multiomics/processeddata/PathwayActivity_CARNIVALinputf.csv")
+#14 rows and 2 columns
 
-#create or upload scaffold network w omnipath
-# need sif table format (node1, interaction, node2)
-#therefore we use the consensus columns of direction (consensus_direction) and sign 
-#(consensus_stimulation and consensus_inhibition) to extract it.
+# creating OmniPath PKN scaffold
 
 omniR <- import_omnipath_interactions()
 #85217 interactions
@@ -67,20 +54,23 @@ sif$source <- gsub(":", "_", sif$source)
 sif$target <- gsub(":", "_", sif$target)
 
 #save SIF
-write_tsv(sif, "~/Masters/RP2/hnrnpu-causal-multiomics/processeddata/omnipath_carnival.tsv")
+write_tsv(sif, "~/hnrnpu-causal-multiomics/processeddata/omnipath_carnival.tsv")
 
-#tf and pathway activities CARNIVAL
-#We use the supplementary functions generateTFList.r and assignPROGENyScores.r to 
-#shift the formats of tf_activities and PathwayActivity to the one required by CARNIVAL.
+tf_vector <- tf_activitiesf %>%
+  dplyr::slice_max(abs(score), n = 50) %>%   # same as top = 50
+  tibble::column_to_rownames("TF") %>%
+  pull(score)
+head(tf_vector)
 
-# dorothea for CARNIVAL
-tf_activities_carnival <- data.frame(tf_activities, stringsAsFactors = F)
-rownames(tf_activities_carnival) <- tf_activities$TF
+progeny_vector <- PathwayActivity %>%
+  tibble::column_to_rownames("Pathway") %>%
+  pull(score)
+
+tf_activities_carnival <- data.frame(tf_activitiesf, stringsAsFactors = F)
+rownames(tf_activities_carnival) <- tf_activitiesf$TF #656 TFs
 tf_activities_carnival$TF <- NULL
 tfList = generateTFList(tf_activities_carnival, top=50, access_idx = 1)
-head(tfList)
 
-# progeny for CARNIVAL
 load(file = system.file("progenyMembers.RData",package="CARNIVAL"))
 
 PathwayActivity_carnival <- data.frame(PathwayActivity, stringsAsFactors = F)
@@ -91,47 +81,25 @@ progenylist = assignPROGENyScores(progeny = t(PathwayActivity_carnival),
                                   id = "gene", 
                                   access_idx = 1)
 
-#CARNIVAL has been developed to find the causal link between the activities of the transcription factors (TFs) 
-#and the ‘perturbed’ nodes. 
-#3 inputs
-#measObj: The TFs’ activities (like the ones we have obtained from DoRothEA)
-#inputObj: The ‘perturbed’ nodes we want that CARNIVAL connects with the activity of TFs. 
-#There are 3 ways of using it:
-# 1. Give the name and sign of the selected nodes;
-# 2. Give the name only, so the algorithm will select the sign that best fit the models,
-# 3. Give NULL as value will create a “Perturbation” node that will try both signs for all ‘initial’ nodes of the given network ( netObj ).
-
-#netObj: The network that will serve as map to connect the TFs’ activities ( measObj ) and the perturbed nodes ( inputObj )
-#Although it is not required, a fourth object called weightObj can be also given. This object gives values ranged from -1 to 1 
-#for a set of nodes of the network. The aim of weightObj is helping the solver to find optimal solutions faster.
-
-#In the present example, we use assign as perturbation nodes all the “initial” nodes (option 2), 
-#and as weightObj the PROGENy scores assigned to the most representative genes of the calculated pathways,
-
 # get initial nodes
 iniMTX = base::setdiff(sif$source, sif$target)
 iniciators = base::data.frame(base::matrix(data = NaN, nrow = 1, ncol = length(iniMTX)), stringsAsFactors = F)
 colnames(iniciators) = iniMTX
 
-# If you used top=50 and access_idx = 1
-tf_df <- tfList[[1]]              # first element of the list
-measVec <- as.numeric(tf_df[1, ]) # extract numeric values
-names(measVec) <- colnames(tf_df) # TF names
+sum(names(tf_vector) %in% unique(c(sif$source, sif$target)))
 
-carnival_result = runCARNIVAL(inputObj= iniciators,
-                              measObj = measVec, 
-                              netObj = sif, 
-                              weightObj = progenylist$score, 
-                              solverPath = "C:/Users/diana/Downloads/Cbc-releases.2.10.12-windows-2022-msvs-v17-Release-x64/bin/cbc.exe", 
-                              solver = "cbc",
-                              timelimit=7200,
-                              mipGAP=0,
-                              poolrelGAP=0)
+# run carnival
+carnival_result = runCARNIVAL( inputObj= iniciators,
+                               measObj = tfList$score, 
+                               netObj = sif, 
+                               weightObj = progenylist$score, 
+                               solverPath = "C:/Program Files/IBM/ILOG/CPLEX_Studio2211/cplex/bin/x64_win64/cplex.exe", 
+                               solver = "cplex",
+                               timelimit=7200,
+                               mipGAP=0,
+                               poolrelGAP=0 )
 
-
-
-
-#transform to data.frame
+#transoform to data.frame
 carnival_result$weightedSIF <- data.frame(carnival_result$weightedSIF, stringsAsFactors = F)
 carnival_result$weightedSIF$Sign <- as.numeric(carnival_result$weightedSIF$Sign)
 carnival_result$weightedSIF$Weight <- as.numeric(carnival_result$weightedSIF$Weight)
@@ -147,12 +115,46 @@ saveRDS(carnival_result,"~/hnrnpu-causal-multiomics/processeddata/carnival_resul
 # visualization
 visNet = carnival_visNet(evis = carnival_result$weightedSIF,
                          nvis = carnival_result$nodesAttributes)
+
 #visNet
 visSave(visNet, file = paste0('carnival_visualization_visNetwork.html'), selfcontained = TRUE)
 
-##### analysis of CARNIVAL results #####
-BiocManager::install("piano")
-BiocManager::install("GSEABase")
+
+# ANALYSIS CARNIVAL results
+packageDescription("CARNIVAL")
+vignette("CARNIVAL")
+
+
+##### trial again adapted to carnival 2.20.0
+
+tf_measObj <- t(as.matrix(tf_vector))
+
+tf_measObj <- as.data.frame(tf_measObj)
+str(tf_measObj)
+head(tf_measObj)
+progeny_matrix <- t(as.matrix(progeny_vector))
+
+iniMTX = base::setdiff(sif$source, sif$target)
+iniciators = base::data.frame(base::matrix(data = NaN, nrow = 1, ncol = length(iniMTX)), stringsAsFactors = F)
+colnames(iniciators) = iniMTX
+
+
+sum(colnames(tf_measObj) %in% unique(c(sif$source, sif$target)))
+
+carnival_result <- runCARNIVAL(
+  inputObj  = iniciators,             # perturbation object
+  measObj   = tf_measObj,             # TF activity measurements
+  netObj    = sif,                    # prior knowledge network
+  weightObj = progeny_vector,         # pathway activity scores (or progeny_matrix)
+  solverPath = "C:/Program Files/IBM/ILOG/CPLEX_Studio2211/cplex/bin/x64_win64/cplex.exe", 
+  solver     = "cplex",
+  timelimit  = 7200, 
+  mipGAP     = 0,
+  poolrelGAP = 0
+)
+str(carnival_result)
+
+# ANALYSIS
 library(readr)
 library(piano)
 library(dplyr)
@@ -170,13 +172,112 @@ library(pheatmap)
 library(ggraph)
 library(tidygraph)
 
-
 ## We also load the support functions
 source("support_enrichment.r")
 source("support_networks.r")
 
-## and the data
+install.packages("msigdbr")
+library(msigdbr)
+msigdbr_collections()  
+go_terms <- msigdbr(species = "Homo sapiens", collection = "C5") 
+head(go_terms)
 
-#read CARNIVAL results
-carnival_result = readRDS("~/hnrnpu-causal-multiomics/processeddata/carnival_result.rds")
-pkn = read_tsv("~/hnrnpu-causal-multiomics/processeddata/omnipath_carnival.tsv")
+brain_go <- go_terms[grep("brain|neuro|synapse|axon|neuron|autism|neurodev", go_terms$gs_name, ignore.case = TRUE), ]
+unique(brain_go$gs_name)
+brain_gene_sets <- split(brain_go$gene_symbol, brain_go$gs_name)
+head(brain_gene_sets)
+
+nodes_carnival # your 624 CARNIVAL nodes
+gsc_brain <- list(
+  genesets = brain_gene_sets,
+  gs_genes = unique(brain_go$gene_symbol),
+  gs_descr = names(brain_gene_sets)
+)
+head(gsc_brain)
+
+##
+str(carnival_result$sifAll[[1]])
+colnames(carnival_result$sifAll[[1]])
+# Combine all edges from all solutions
+all_edges <- do.call(rbind, lapply(carnival_result$sifAll, function(sol) {
+  as.data.frame(sol)[, c("Node1", "Node2")]
+}))
+
+# Extract unique nodes for enrichment
+nodes_carnival <- unique(c(all_edges$Node1, all_edges$Node2))
+
+#THIS ONE HERE
+nodes_carnival <- extractCARNIVALnodes(carnival_result)
+# Check
+length(nodes_carnival)
+head(nodes_carnival)
+str(nodes_carnival)
+
+
+
+#ignore
+nodes_background <- unique(c(carnival_result$nodesAttributes$Node))  # or whatever column has all nodes
+length(nodes_background)
+
+#sfari
+sfari_df <- read.csv("SFARI-Gene_genes_10-23-2025release_12-03-2025export.csv", stringsAsFactors = FALSE)
+#convert to GSC here
+gsc_sfari <- list(
+  genesets = list(SFARI = sfari_genes),
+  gs_id <- "SFARI",
+  gs_genes = sfari_genes,
+  gs_descr = "SFARI curated autism gene set"
+)
+head(gsc_sfari)
+class(gsc_sfari) <- "GSC"
+
+colnames(sfari_df)
+sfari_genes <- unique(sfari_df$gene.symbol)  # change column name accordingly
+length(sfari_genes)
+length(intersect(nodes_carnival$bg, sfari_genes))
+
+length(gsc_sfari$genesets$SFARI)
+gsc_sfari$gs_id
+class(gsc_sfari)
+
+## new approach
+#create SFARI GMT file
+sfari_genes <- unique(sfari_df$gene.symbol) #genes that exist in the universe
+sfari_genes <- intersect(sfari_genes, nodes_carnival$bg)
+#815
+gsc_sfari <- list(
+  genesets = list(SFARI = sfari_genes),
+  gs_id    = "SFARI",
+  gs_descr = "SFARI autism gene set",
+  gs_genes = sfari_genes
+)
+
+length(gsc_sfari$genesets$SFARI)  # 815
+length(intersect(nodes_carnival$bg, gsc_sfari$genesets$SFARI))  #815
+
+sfari_gsc_df <- data.frame(
+  gene_symbol = sfari_genes,
+  gene_set = rep("SFARI", length(sfari_genes)),  # repeat "SFARI" for each gene
+  stringsAsFactors = FALSE
+)
+head(sfari_gsc_df)
+loadGSC(sfari_gsc_df)
+# check
+head(sfari_gsc_df)
+sfari_genes <- intersect(sfari_df$gene.symbol, nodes_carnival$bg)
+
+sig_sfari <- runGSAhyper(
+  genes = nodes_carnival$sucesses,
+  universe = nodes_carnival$bg,
+  gsc = loadGSC(sfari_gsc_df)
+)
+head(sfari_df)
+length(intersect(nodes_carnival$sucesses, nodes_carnival$bg))
+## go from here after nodes_carnival
+#sfari 
+sig_pathways_sfari <- runGSAhyper(genes = nodes_carnival$sucesses, 
+                            universe = nodes_carnival$bg, gsc = loadGSC(gsc_sfari))
+sig_pathways_df <- as.data.frame(sig_pathways$resTab)  %>% 
+  tibble::rownames_to_column(var = "pathway")
+
+#gsc_brain

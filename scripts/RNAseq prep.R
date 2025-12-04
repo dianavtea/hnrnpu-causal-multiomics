@@ -1,15 +1,19 @@
-##### 20.11.2025 RNAseq DESeq2 and vst #####
-##### packages #####
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
+#Another trial for data setup 01.12.25
+#DIFFERENCE = filtered on merged gene counts making file
+#from 63677 obs to 17636 genes, typical amount for cleaned up dataframe
+#still transcriptutorial
 
-BiocManager::install("DESeq2")
-BiocManager::install("ggpubr")
-BiocManager::install("org.Hs.eg.db")
-BiocManager::install("biomaRt")
-install.packages("dplyr")
-library(DESeq2)
+library(readr)
 library(ggplot2)
+library(reshape)
+library(pheatmap)
+library(gridExtra)
+library(grid)
+library(cowplot)
+library(ggrepel)
+BiocManager::install("hexbin")
+library(hexbin)
+library(DESeq2)
 library(ggpubr)
 library(biomaRt)
 library(RSQLite)
@@ -17,46 +21,43 @@ library(org.Hs.eg.db)
 library(readxl)
 library(dplyr)
 
-#clean environment
-rm(list=ls())
+source("support_functions.R") 
+merged_gene_counts <- as.data.frame(
+  read.delim("~/hnrnpu-causal-multiomics/rawdata/merged_gene_counts 1.txt", header=TRUE, stringsAsFactors = FALSE,row.names=1))
+#63677 genes
 
-##### DESeq2 #####
-# read data
-cr <- read.delim("~/hnrnpu-causal-multiomics/rawdata/merged_gene_counts 1.txt", header=TRUE, stringsAsFactors = FALSE,row.names=1)
-md <- read.delim("~/hnrnpu-causal-multiomics/rawdata/columndata 1.txt", header=TRUE, sep="\t", row.names = 1,stringsAsFactors = FALSE)
-#check that col names of cr are the same as raw names in md
-all.equal(colnames(cr),rownames(md))
+#simple summary of experimental design
+targets <- as.data.frame(matrix(NA, length(names(merged_gene_counts)),2))
+names(targets) <- c("sample", "condition")
+targets$sample <- names(merged_gene_counts)
+targets$condition <- c("CTRL", "CTRL", "CTRL", "ASD", "ASD", "ASD")
+head(targets)
 
-#check if data is correctly imported
-head(colnames(md))
-all(rownames(md) %in% colnames(cr))
-all(rownames(md) == colnames(cr))
+#merged gene counts without NA
+# Keep genes expressed (>20 counts) in at least 2/3 replicates per group (CTRL vs ASD)
+gene_counts_CTRL <- rowSums(merged_gene_counts[,1:3] > 20) >= 2
+gene_counts_ASD <- rowSums(merged_gene_counts[,4:6] > 20) >= 2
+merged_gene_counts_filtered <- merged_gene_counts[gene_counts_CTRL | gene_counts_ASD, ] #17636 genes
+any(is.na(merged_gene_counts_filtered)) #FALSE, no NA
 
-#create group for multiple factor analysis
-md$group <- factor(paste0(md$StatusCells, md$Day))
-md
+ddsf <- DESeqDataSetFromMatrix(countData = merged_gene_counts_filtered,
+                              colData = targets,
+                              design= ~ condition)
 
-#construct a deseq dataset
-dds <- DESeqDataSetFromMatrix(countData = cr,
-                              colData = md,
-                              design= ~ group)
+ddsf$condition<- relevel( ddsf$condition, "CTRL" )
+ddsf <- DESeq(ddsf)
+resultsNames(ddsf)
+resf <- results(ddsf)
 
-dds$group<- relevel( dds$group, "CTRLD28" )
-
-dds <- DESeq(dds)
-resultsNames(dds)
-res <- results(dds)
-
-res.mat <- cbind(counts(dds, normalized=TRUE), res$log2FoldChange, res$padj)
-
-mcols(res, use.names = TRUE)
-saveRDS(dds, file="dds_DEG_ASDvsCTRL_D28.rds")
-head(res)
+resf.mat <- cbind(counts(ddsf, normalized=TRUE), resf$log2FoldChange, resf$padj)
+mcols(resf, use.names = TRUE)
+saveRDS(ddsf, file="dds_DEG_ASDvsCTRL_D28_filt.rds")
+head(resf)
 
 ##### annotations #####
 #Connect to GRCh37 Ensembl
 # Use rownames of res directly
-ensembl_ids <- rownames(res)
+ensembl_ids <- rownames(resf)
 
 mart <- useEnsembl(
   biomart = "ensembl",
@@ -71,11 +72,11 @@ annot <- getBM(
   mart = mart
 )
 
-res.df <- as.data.frame(res)
-res.df$ensembl <- ensembl_ids
+resf.df <- as.data.frame(resf)
+resf.df$ensembl <- ensembl_ids
 
-res.annot <- merge(
-  res.df,
+resf.annot <- merge(
+  resf.df,
   annot,
   by.x = "ensembl",
   by.y = "ensembl_gene_id",
@@ -83,107 +84,94 @@ res.annot <- merge(
   sort = FALSE
 )
 
-res.annot <- res.annot[match(ensembl_ids, res.annot$ensembl), ]
+resf.annot <- resf.annot[match(ensembl_ids, resf.annot$ensembl), ]
 
-colnames(res.annot)[colnames(res.annot) == "entrezgene_id"] <- "entrez"
-colnames(res.annot)[colnames(res.annot) == "hgnc_symbol"]   <- "hgnc_symbol"
-head(res.annot)
-
+colnames(resf.annot)[colnames(resf.annot) == "entrezgene_id"] <- "entrez"
+colnames(resf.annot)[colnames(resf.annot) == "hgnc_symbol"]   <- "hgnc_symbol"
+head(resf.annot)
+write.csv(resf.annot, "DESeq2_results.csv", row.names = FALSE)
 ##### VST #####
-vst_dds <- vst(dds, blind = FALSE)
-vst_mat <- assay(vst_dds)
-
-#OPTIONAL - not very valuable for only 6 samples 
-#dists <- dist(t(vst_mat))  # transpose so samples are columns
-#hc <- hclust(dists)
-#plot(hc, main = "Hierarchical clustering of samples (VST)")
-#pheatmap(as.matrix(dists),
-#         clustering_distance_rows = "euclidean",
-#         clustering_distance_cols = "euclidean",
-#         main = "Sample-to-sample distances (VST)")
+vst_ddsf <- vst(ddsf, blind = FALSE)
+vst_matf <- assay(vst_ddsf)
+#105816 elements
+dim(vst_matf) #17636 genes x 6 samples
 
 # Ensure rows of res.annot match vst_mat
-res.annot <- res.annot[match(rownames(vst_mat), res.annot$ensembl), ]
+resf.annot <- resf.annot[match(rownames(vst_matf), resf.annot$ensembl), ]
 
-vst_annot <- cbind(res.annot[, c("ensembl", "entrez", "hgnc_symbol")], vst_mat)
+vst_annotf <- cbind(resf.annot[, c("ensembl", "entrez", "hgnc_symbol")], vst_matf)
 
-write.csv(vst_annot, "VST_counts_with_annotation.csv", row.names = FALSE)
+write.csv(vst_annotf, "VST_counts_with_annotation_filt.csv", row.names = FALSE)
 
-head(vst_mat)
 #vst for progeny
-vst_progeny <- vst_mat
-rownames(vst_progeny) <- res.annot$hgnc_symbol
-head(vst_progeny)
-any(is.na(vst_progeny)) #false
-rownames(vst_progeny)[duplicated(rownames(vst_progeny))] 
-vst_progeny <- vst_progeny[rownames(vst_progeny) != "", ] #remove blanks
-vst_progeny <- vst_progeny[!duplicated(rownames(vst_progeny)), ] #remove dups
-any(rownames(vst_progeny) == "")       # should be FALSE
-any(duplicated(rownames(vst_progeny))) # should be FALSE
+vst_progenyf <- vst_matf
+rownames(vst_progenyf) <- resf.annot$hgnc_symbol
+head(vst_progenyf)
+any(is.na(vst_progenyf)) #false
 
-write.csv(vst_progeny, "VST_progeny.csv", row.names = TRUE)
+rownames(vst_progenyf)[duplicated(rownames(vst_progenyf))] 
+vst_progenyf <- vst_progenyf[rownames(vst_progenyf) != "", ] #remove blanks
+vst_progenyf <- vst_progenyf[!duplicated(rownames(vst_progenyf)), ] #remove dups
 
-##### prep for infer TF activities (ID and stat) #####
+any(rownames(vst_progenyf) == "")       # should be FALSE
+any(duplicated(rownames(vst_progenyf))) # should be FALSE
+
+write.csv(vst_progenyf, "VST_progeny_filt.csv", row.names = TRUE)
+write.csv(targets, "targets.csv", row.names = FALSE)
+
+plotPCA(vst_ddsf, intgroup = "condition")
+
+
+# PCA plot
+pca_plot <- plotPCA(vst_ddsf, intgroup = "condition") +
+  theme_bw() +
+  theme(
+    axis.title = element_text(face = "bold", size = 12),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(face = "bold", size = 11),
+    legend.text = element_text(size = 10)
+  ) +
+  labs(title = "PCA of VST-transformed counts")
+
+# Save as high-resolution image for publication
+ggsave(
+  filename = "PCA_plot.pdf",      # use PDF or PNG
+  plot = pca_plot,           
+  width = 6, height = 5,          # size in inches
+  dpi = 300                       # resolution for PNG (ignored for PDF)
+)
+
+##### prep for infer TF activities #####
 #open file which is currently excel format
-DEG_ASD12D28_vs_CTRL9D28 <- read_excel("~/hnrnpu-causal-multiomics/rawdata/bulkRNAseq/DEG_ASD12D28_vs_CTRL9D28 .xlsx")
-View(DEG_ASD12D28_vs_CTRL9D28)
-
-#clean file w symbol, stat, logFC and padj (filtered later)
-DEG_allstats <- DEG_ASD12D28_vs_CTRL9D28 %>%
+DEG_ASD_vs_CTRL <- read.csv("~/hnrnpu-causal-multiomics/DESeq2_results.csv")
+head(DEG_ASD_vs_CTRL)
+#clean file w symbol, stat, logFC, pvalue and padj 
+DEG_allstatsf <- DEG_ASD_vs_CTRL %>%
   # Keep only the columns you want
-  dplyr::select(hgnc_symbol, stat, log2FoldChange, padj) %>%
+  dplyr::select(hgnc_symbol, stat, log2FoldChange, pvalue, padj) %>%
   # Make into numeric and not chr
   mutate(
     stat = as.numeric(stat), 
     log2FoldChange = as.numeric(log2FoldChange),
+    pvalue = as.numeric(pvalue),
     padj = as.numeric(padj)
   ) %>%
-  # Rename columns to how FUNKI wants it
   rename(
     ID = hgnc_symbol,
     statistic = stat
   ) %>%
   # Remove rows with missing values
-  filter(!is.na(ID), !is.na(statistic), !is.na(log2FoldChange), !is.na(padj))
-head(DEG_allstats)
-any(is.na(DEG_allstats)) #check if any NA in DEG_allstats
-write.csv(DEG_allstats, "DEG_allstats.csv", row.names = FALSE)
-#can put this csv put into shinyFUNKI (optional)
+  filter(!is.na(ID), !is.na(statistic), !is.na(log2FoldChange), !is.na(pvalue),!is.na(padj))
+head(DEG_allstatsf)
+any(is.na(DEG_allstatsf)) #check if any NA in DEG_allstats
+write.csv(DEG_allstatsf, "DEG_allstatsf.csv", row.names = FALSE)
+#17627 genes now
 
-#OPTIONAL: run shinyFUNKI locally (setup available in other R file) - optional
-#shiny::runGitHub(repo = "ShinyFUNKI", username = "saezlab", subdir = "FUNKI")
 
-#remove any random or dup ids with numbers only
-deg_clean <- DEG_allstats %>%
-  dplyr::filter(!grepl("^[0-9]+$", ID))
-
-deg_mat <- deg_clean %>%
-  tibble::column_to_rownames("ID") %>%
-  as.matrix()
-
-#need to be in matrix format
-head(deg_mat)
-
-#filter for only one statistic - i choose wald statistic
-degstat <- DEG_allstats %>%
-  dplyr::select(ID, statistic)
-head(degstat)
-
-deg_clean1 <- degstat %>%
-  dplyr::filter(!grepl("^[0-9]+$", ID)) %>%
-  dplyr::distinct(ID, .keep_all = TRUE)
-
-degstat_mat <- deg_clean1 %>%
-  tibble::column_to_rownames("ID") %>%
-  as.matrix()
-head(degstat_mat)
-any(is.na(degstat_mat))
-write.csv(degstat_mat, "DEG_statistic.csv", row.names = TRUE)
-
-##### most important outputs here #####
-dds #DESeq2
-res #results of DESeq2
-vst_annot
-vst_progeny
-DEG_allstats
-degstat_mat #wald stat only and ID 'ID', 'statistic'
+##### important outputs #####
+ddsf
+resf
+vst_annotf
+vst_progenyf
+targets
+DEG_allstatsf
