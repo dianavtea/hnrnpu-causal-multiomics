@@ -143,7 +143,7 @@ ggsave(
 
 ##### prep for infer TF activities #####
 #open file which is currently excel format
-DEG_ASD_vs_CTRL <- read.csv("~/hnrnpu-causal-multiomics/DESeq2_results.csv")
+DEG_ASD_vs_CTRL <- read.csv("~/hnrnpu-causal-multiomics/processeddata/DESeq2_results.csv")
 head(DEG_ASD_vs_CTRL)
 #clean file w symbol, stat, logFC, pvalue and padj 
 DEG_allstatsf <- DEG_ASD_vs_CTRL %>%

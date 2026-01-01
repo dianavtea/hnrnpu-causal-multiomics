@@ -153,7 +153,7 @@ write.csv(DEG_allstats, "DEG_allstats.csv", row.names = FALSE)
 #can put this csv put into shinyFUNKI (optional)
 
 #OPTIONAL: run shinyFUNKI locally (setup available in other R file) - optional
-#shiny::runGitHub(repo = "ShinyFUNKI", username = "saezlab", subdir = "FUNKI")
+shiny::runGitHub(repo = "ShinyFUNKI", username = "saezlab", subdir = "FUNKI")
 
 #remove any random or dup ids with numbers only
 deg_clean <- DEG_allstats %>%

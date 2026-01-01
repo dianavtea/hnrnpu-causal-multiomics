@@ -1,0 +1,437 @@
+---
+title: "RNAseq_DEG_analysis"
+author: "F Mastropasqua"
+date: "10/4/2022"
+output: html_document
+---
+```{r}
+
+```
+
+
+```{r}
+knitr::opts_chunk$set(error = TRUE)
+#load libraries
+library(DESeq2)
+library(ggplot2)
+library("biomaRt")
+library(dplyr)
+library(tibble)
+```
+
+## Transcriptome analysis at three timepoints
+
+The bulk RNAseq results from different sequencing projects have been merged and selected by including the genes that had at least 20 counts in one of the samples analyzed, in order to exclude false positives.
+At each time point two conditions are analyzed:
+-"notreat": HNRNPUdel/+ (here called ASD) versus CTRL
+-"sirna": siHNRNPU versus siNTC (here called "siRNActrl")
+
+```{r}
+# read data
+cr <- read.delim("./Complete_merged_gene_counts_more20count.txt", header=TRUE, sep=",", row.names = 1)
+md <- read.delim("./Complete_columndata.txt", header=TRUE, sep=",", row.names = 1,stringsAsFactors = FALSE)
+
+md <-data.frame(column_to_rownames(md, var = "NGI_ID"))
+#sample 136 is an outlier (as showed from the diagnostic plots at the end of this script) so it was removed from the analysis
+md <-md[md$SampleNumber!="136",]
+cr[,c(50)] <- NULL
+
+#check that col names of cr are the same as raw names in md
+all.equal(colnames(cr),rownames(md))
+
+#check if data is correctly imported
+head(colnames(md))
+all(rownames(md) %in% colnames(cr))
+all(rownames(md) == colnames(cr))
+
+md_sirna <-md[md$StatusCells== "siRNActrl"|md$StatusCells== "siHNRNPU",]
+cr_sirna <- cr[,rownames(md_sirna)]
+
+md_notreat <- md[!md$StatusCells %in% c("siHNRNPU","siRNActrl"),]
+cr_notreat <- cr[,rownames(md_notreat)]
+```
+
+##HNRNPUdel/+ (here called ASD) versus CTRL 
+
+(HNRNPUdel/+ is here called ASD) 
+
+general analysis including all time points
+ 
+```{r}
+#create group for multiple factor analysis
+md_notreat$group <- factor(paste0(md_notreat$StatusCells, md_notreat$Day))
+
+#contruct a deseq dataset
+dds_notreat <- DESeqDataSetFromMatrix(countData = cr_notreat,
+                                    colData = md_notreat,
+                                    design= ~ group)
+
+dds_notreat$group<- relevel( dds_notreat$group, "CTRLD0" )
+
+dds_notreat <- DESeq(dds_notreat)
+resultsNames(dds_notreat)
+res_notreat <- results(dds_notreat)
+summary(res_notreat)
+res.mat_notreat <- cbind(counts(dds_notreat, normalized=TRUE), res_notreat$log2FoldChange, res_notreat$padj)
+
+mcols(res_notreat, use.names = TRUE)
+sum(res_notreat$padj <0.05, na.rm=TRUE)
+sum(abs(res_notreat$log2FoldChange)>0.58 & res_notreat$padj <0.05 & res_notreat$baseMean>20 , na.rm = TRUE)
+head(res_notreat)
+
+#adding gene names
+res_notreat$ensembl <- sapply( strsplit( rownames(res_notreat), split="\\..+$"), "[", 1)
+
+ensembl = useMart("ENSEMBL_MART_ENSEMBL",
+                  host = "grch37.ensembl.org", 
+                  #host = "useast.ensembl.org"
+)
+ensembl = useDataset("hsapiens_gene_ensembl", mart = ensembl)
+genemap <- getBM( attributes = c("ensembl_gene_id", "entrezgene_id", "hgnc_symbol"),
+                  filters = "ensembl_gene_id",
+                  values =   res_notreat$ensembl,
+                  mart = ensembl )
+idx <-match(res_notreat$ensembl, genemap$ensembl_gene_id)
+res_notreat$entrez <- genemap$entrezgene[ idx ]
+res_notreat$hgnc_symbol <- genemap$hgnc_symbol[ idx ]
+
+rownames(dds_notreat)=make.names(res_notreat$hgnc_symbol, unique=TRUE)
+rownames(res_notreat)=make.names(res_notreat$hgnc_symbol, unique=TRUE)
+
+```
+
+Plot HNRNPU expression during differentiation in HNRNPUdel/+ (here called ASD) and CTRL (Figure 1B)
+
+```{r}
+genename <- "HNRNPU"
+c <- plotCounts(dds_notreat, genename, intgroup=c("StatusCells","Day"), returnData=TRUE)
+c
+
+c$StatusCells <- factor(c$StatusCells, c("CTRL", "ASD"))
+c$Day <-factor(c$Day, c("D0", "D5", "D28"))
+levels(c$StatusCells )[levels(c$StatusCells )=="CTRL"] <- "CTRL"
+levels(c$StatusCells )[levels(c$StatusCells )=="ASD"] <- "HNRNPUdel"
+ggplot(c, aes(x=Day, y=count, col=StatusCells)) + 
+  geom_boxplot(outlier.shape = NA,  position = position_dodge(width = 0))+
+  geom_point(position=position_jitter(w=0.2,h=0))+
+  geom_smooth(alpha=0.2, aes(as.integer(Day), y=count, color=StatusCells, fill=StatusCells))+
+  ggtitle(genename)+ #xxx expression
+  ylab("normalized counts")+
+  xlab("Day")+
+  scale_fill_manual(values=c("#0072B2","#E69F00"))+
+  scale_colour_manual(values=c("#0072B2","#E69F00"))+
+  theme_classic()
+```
+
+##Time point analysis
+For each timepoint the differential gene expression was calculated.
+
+Analysis at D0- HNRNPUdel/+ vs CTRL
+
+```{r}
+res_ASDD0vsCTRLD0 <- results(dds_notreat, contrast = c("group", "ASDD0", "CTRLD0"))
+mcols(res_ASDD0vsCTRLD0, use.names = TRUE)
+sum( res_ASDD0vsCTRLD0$padj <0.05, na.rm=TRUE)
+sum(abs(res_ASDD0vsCTRLD0$log2FoldChange)>0.58 & res_ASDD0vsCTRLD0$padj <0.05 & res_ASDD0vsCTRLD0$baseMean>20 , na.rm = TRUE)
+    
+#adding gene names
+res_ASDD0vsCTRLD0$ensembl <- sapply( strsplit(rownames(res_ASDD0vsCTRLD0), split="\\..+$"), "[", 1)
+    
+ensembl = useMart("ENSEMBL_MART_ENSEMBL",
+                      #host = "www.ensembl.org", 
+                      host = "useast.ensembl.org"
+    )
+ensembl = useDataset("hsapiens_gene_ensembl", mart = ensembl)
+genemap <- getBM( attributes = c("ensembl_gene_id", "entrezgene_id", "hgnc_symbol"),
+                      filters = "ensembl_gene_id",
+                      values = res_ASDD0vsCTRLD0$ensembl,
+                      mart = ensembl )
+idx <-match( res_ASDD0vsCTRLD0$ensembl, genemap$ensembl_gene_id)
+res_ASDD0vsCTRLD0$entrez <- genemap$entrezgene[ idx ]
+res_ASDD0vsCTRLD0$hgnc_symbol <- genemap$hgnc_symbol[ idx ]
+    
+rownames(dds_notreat)=make.names(res_ASDD0vsCTRLD0$hgnc_symbol, unique=TRUE)
+rownames(res_ASDD0vsCTRLD0)=make.names(res_ASDD0vsCTRLD0$hgnc_symbol, unique=TRUE)
+
+```
+
+Analysis at D5- HNRNPUdel/+ vs CTRL
+
+```{r}
+dds_notreat$group<- relevel(dds_notreat$group, "CTRLD5")
+    
+dds_notreat <- DESeq(dds_notreat)
+resultsNames(dds_notreat)
+    
+res <- results(dds_notreat)
+    
+res.mat <- cbind(counts(dds_notreat, normalized=TRUE), res$log2FoldChange, res$padj)
+    
+mcols(res, use.names = TRUE)
+    
+res_ASDD5vsCTRLD5 <- results(dds_notreat, contrast = c("group", "ASDD5", "CTRLD5"))
+mcols(res_ASDD5vsCTRLD5, use.names = TRUE)
+sum( res_ASDD5vsCTRLD5$padj <0.05, na.rm=TRUE)
+sum(abs(res_ASDD5vsCTRLD5$log2FoldChange)>0.58 & res_ASDD5vsCTRLD5$padj <0.05 & res_ASDD5vsCTRLD5$baseMean>20 , na.rm = TRUE)
+head(res_ASDD5vsCTRLD5)
+    
+     
+#adding gene names
+res_ASDD5vsCTRLD5$ensembl <- sapply( strsplit( rownames(res_ASDD5vsCTRLD5), split="\\..+$"), "[", 1)
+    
+ensembl = useMart("ENSEMBL_MART_ENSEMBL",
+                      #host = "www.ensembl.org", 
+                      host = "useast.ensembl.org"
+    )
+ensembl = useDataset("hsapiens_gene_ensembl", mart = ensembl)
+genemap <- getBM( attributes = c("ensembl_gene_id", "entrezgene_id", "hgnc_symbol"),
+                      filters = "ensembl_gene_id",
+                      values = res_ASDD5vsCTRLD5$ensembl,
+                      mart = ensembl )
+idx <-match( res_ASDD5vsCTRLD5$ensembl, genemap$ensembl_gene_id)
+res_ASDD5vsCTRLD5$entrez <- genemap$entrezgene[ idx ]
+res_ASDD5vsCTRLD5$hgnc_symbol <- genemap$hgnc_symbol[ idx ]
+    
+rownames(dds_notreat)=make.names(res_ASDD5vsCTRLD5$hgnc_symbol, unique=TRUE)
+rownames(res_ASDD5vsCTRLD5)=make.names(res_ASDD5vsCTRLD5$hgnc_symbol, unique=TRUE)
+    
+```
+
+Analysis at D28- HNRNPUdel/+ vs CTRL
+
+```{r}
+dds_notreat$group<- relevel(dds_notreat$group, "CTRLD28")
+    
+dds_notreat <- DESeq(dds_notreat)
+resultsNames(dds_notreat)
+    
+res_ASDD28vsCTRLD28 <- results(dds_notreat)
+    
+res.mat <- cbind(counts(dds_notreat, normalized=TRUE), res_ASDD28vsCTRLD28$log2FoldChange, res_ASDD28vsCTRLD28$padj)
+    
+mcols(res_ASDD28vsCTRLD28, use.names = TRUE)
+    
+res_ASDD28vsCTRLD28 <- results(dds_notreat, contrast = c("group", "ASDD28", "CTRLD28"))
+mcols(res_ASDD28vsCTRLD28, use.names = TRUE)
+sum( res_ASDD28vsCTRLD28$padj <0.05, na.rm=TRUE)
+sum(abs(res_ASDD28vsCTRLD28$log2FoldChange)>0.58 & res_ASDD28vsCTRLD28$padj <0.05 & res_ASDD28vsCTRLD28$baseMean>20 , na.rm = TRUE)
+head(res_ASDD28vsCTRLD28)
+    
+     
+#adding gene names
+res_ASDD28vsCTRLD28$ensembl <- sapply( strsplit( rownames(res_ASDD28vsCTRLD28), split="\\..+$"), "[", 1)
+    
+ensembl = useMart("ENSEMBL_MART_ENSEMBL",
+                      #host = "www.ensembl.org", 
+                      host = "useast.ensembl.org"
+    )
+ensembl = useDataset("hsapiens_gene_ensembl", mart = ensembl)
+genemap <- getBM( attributes = c("ensembl_gene_id", "entrezgene_id", "hgnc_symbol"),
+                      filters = "ensembl_gene_id",
+                      values = res_ASDD28vsCTRLD28$ensembl,
+                      mart = ensembl )
+idx <-match( res_ASDD28vsCTRLD28$ensembl, genemap$ensembl_gene_id)
+res_ASDD28vsCTRLD28$entrez <- genemap$entrezgene[ idx ]
+res_ASDD28vsCTRLD28$hgnc_symbol <- genemap$hgnc_symbol[ idx ]
+    
+rownames(dds_notreat)=make.names(res_ASDD28vsCTRLD28$hgnc_symbol, unique=TRUE)
+rownames(res_ASDD28vsCTRLD28)=make.names(res_ASDD28vsCTRLD28$hgnc_symbol, unique=TRUE)
+    
+```
+
+##siHNRNPU versus siNTC 
+
+(siNTC is here called "siRNActrl")
+
+general analysis including all time points
+
+```{r}
+#create group for multiple factor analysis
+md_sirna$group <- factor(paste0(md_sirna$StatusCells, md_sirna$Day))
+
+#contruct a deseq dataset
+dds_sirna <- DESeqDataSetFromMatrix(countData = cr_sirna,
+                              colData = md_sirna,
+                              design= ~ group)
+
+dds_sirna$StatusHNRNPU<- relevel( dds_sirna$group, "siRNActrl_D0" )
+
+dds_sirna <- DESeq(dds_sirna)
+resultsNames(dds_sirna)
+res_sirna <- results(dds_sirna)
+summary(res_sirna)
+res.mat_sirna <- cbind(counts(dds_sirna, normalized=TRUE), res_sirna$log2FoldChange, res_sirna$padj)
+mcols(res_sirna, use.names = TRUE)
+
+```
+
+Analysis at D0- siHNRNPU vs siNTC
+
+```{r}
+res_siHNRNPUD0vssiRNActrlD0 <- results(dds_sirna, contrast = c("group", "siHNRNPUD0", "siRNActrlD0"))
+mcols(res_siHNRNPUD0vssiRNActrlD0, use.names = TRUE)
+
+sum(abs(res_siHNRNPUD0vssiRNActrlD0$log2FoldChange)>0.58 & res_siHNRNPUD0vssiRNActrlD0$padj <0.05 & res_siHNRNPUD0vssiRNActrlD0$baseMean>20 , na.rm = TRUE)
+
+#adding gene names
+res_siHNRNPUD0vssiRNActrlD0$ensembl <- sapply( strsplit( rownames(res_siHNRNPUD0vssiRNActrlD0), split="\\..+$"), "[", 1)
+
+ensembl = useMart("ENSEMBL_MART_ENSEMBL",
+                  #host = "www.ensembl.org", 
+                  host = "useast.ensembl.org"
+)
+ensembl = useDataset("hsapiens_gene_ensembl", mart = ensembl)
+genemap <- getBM( attributes = c("ensembl_gene_id", "entrezgene_id", "hgnc_symbol"),
+                  filters = "ensembl_gene_id",
+                  values = res_siHNRNPUD0vssiRNActrlD0$ensembl,
+                  mart = ensembl )
+idx <-match( res_siHNRNPUD0vssiRNActrlD0$ensembl, genemap$ensembl_gene_id)
+res_siHNRNPUD0vssiRNActrlD0$entrez <- genemap$entrezgene[ idx ]
+res_siHNRNPUD0vssiRNActrlD0$hgnc_symbol <- genemap$hgnc_symbol[ idx ]
+
+rownames(dds_sirna)=make.names(res_siHNRNPUD0vssiRNActrlD0$hgnc_symbol, unique=TRUE)
+rownames(res_siHNRNPUD0vssiRNActrlD0)=make.names(res_siHNRNPUD0vssiRNActrlD0$hgnc_symbol, unique=TRUE)
+
+```
+
+Analysis at D5- siHNRNPU vs siNTC
+
+```{r}
+dds_sirna$group<- relevel( dds_sirna$group, "siRNActrlD5" )
+
+dds_sirna <- DESeq(dds_sirna)
+resultsNames(dds_sirna)
+
+res_siHNRNPUD5vssiRNActrlD5 <- results(dds_sirna)
+
+res.mat_sirnaD5 <- cbind(counts(dds_sirna, normalized=TRUE), res_siHNRNPUD5vssiRNActrlD5$log2FoldChange, res_siHNRNPUD5vssiRNActrlD5$padj)
+
+mcols(res_siHNRNPUD5vssiRNActrlD5, use.names = TRUE)
+
+res_siHNRNPUD5vssiRNActrlD5 <- results(dds_sirna, contrast = c("group", "siHNRNPUD5", "siRNActrlD5"))
+mcols(res_siHNRNPUD5vssiRNActrlD5, use.names = TRUE)
+
+sum(abs(res_siHNRNPUD5vssiRNActrlD5$log2FoldChange)>0.58 & res_siHNRNPUD5vssiRNActrlD5$padj <0.05 & res_siHNRNPUD5vssiRNActrlD5$baseMean>20 , na.rm = TRUE)
+
+#adding gene names
+res_siHNRNPUD5vssiRNActrlD5$ensembl <- sapply( strsplit( rownames(res_siHNRNPUD5vssiRNActrlD5), split="\\..+$"), "[", 1)
+
+ensembl = useMart("ENSEMBL_MART_ENSEMBL",
+                  #host = "www.ensembl.org", 
+                  host = "useast.ensembl.org"
+)
+ensembl = useDataset("hsapiens_gene_ensembl", mart = ensembl)
+genemap <- getBM( attributes = c("ensembl_gene_id", "entrezgene_id", "hgnc_symbol"),
+                  filters = "ensembl_gene_id",
+                  values = res_siHNRNPUD5vssiRNActrlD5$ensembl,
+                  mart = ensembl )
+idx <-match( res_siHNRNPUD5vssiRNActrlD5$ensembl, genemap$ensembl_gene_id)
+res_siHNRNPUD5vssiRNActrlD5$entrez <- genemap$entrezgene[ idx ]
+res_siHNRNPUD5vssiRNActrlD5$hgnc_symbol <- genemap$hgnc_symbol[ idx ]
+
+rownames(dds_sirna)=make.names(res_siHNRNPUD5vssiRNActrlD5$hgnc_symbol, unique=TRUE)
+rownames(res_siHNRNPUD5vssiRNActrlD5)=make.names(res_siHNRNPUD5vssiRNActrlD5$hgnc_symbol, unique=TRUE)
+
+```
+
+Analysis at D28- siHNRNPU vs siNTC
+
+```{r}
+dds_sirna$group<- relevel( dds_sirna$group, "siRNActrlD28" )
+
+dds_sirna <- DESeq(dds_sirna)
+resultsNames(dds_sirna)
+
+res_siHNRNPUD28vssiRNActrlD28 <- results(dds_sirna)
+
+res.mat_sirnaD28 <- cbind(counts(dds_sirna, normalized=TRUE), res_siHNRNPUD28vssiRNActrlD28$log2FoldChange, res_siHNRNPUD28vssiRNActrlD28$padj)
+
+mcols(res_siHNRNPUD28vssiRNActrlD28, use.names = TRUE)
+
+res_siHNRNPUD28vssiRNActrlD28 <- results(dds_sirna, contrast = c("group", "siHNRNPUD28", "siRNActrlD28"))
+mcols(res_siHNRNPUD28vssiRNActrlD28, use.names = TRUE)
+
+sum(abs(res_siHNRNPUD28vssiRNActrlD28$log2FoldChange)>0.58 & res_siHNRNPUD28vssiRNActrlD28$padj <0.05 & res_siHNRNPUD28vssiRNActrlD28$baseMean>20 , na.rm = TRUE)
+
+#adding gene names
+res_siHNRNPUD28vssiRNActrlD28$ensembl <- sapply( strsplit( rownames(res_siHNRNPUD28vssiRNActrlD28), split="\\..+$"), "[", 1)
+
+ensembl = useMart("ENSEMBL_MART_ENSEMBL",
+                  #host = "www.ensembl.org", 
+                  host = "useast.ensembl.org"
+)
+ensembl = useDataset("hsapiens_gene_ensembl", mart = ensembl)
+genemap <- getBM( attributes = c("ensembl_gene_id", "entrezgene_id", "hgnc_symbol"),
+                  filters = "ensembl_gene_id",
+                  values = res_siHNRNPUD28vssiRNActrlD28$ensembl,
+                  mart = ensembl )
+idx <-match( res_siHNRNPUD28vssiRNActrlD28$ensembl, genemap$ensembl_gene_id)
+res_siHNRNPUD28vssiRNActrlD28$entrez <- genemap$entrezgene[ idx ]
+res_siHNRNPUD28vssiRNActrlD28$hgnc_symbol <- genemap$hgnc_symbol[ idx ]
+
+rownames(dds_sirna)=make.names(res_siHNRNPUD5vssiRNActrlD5$hgnc_symbol, unique=TRUE)
+rownames(res_siHNRNPUD28vssiRNActrlD28)=make.names(res_siHNRNPUD5vssiRNActrlD5$hgnc_symbol, unique=TRUE)
+
+```
+
+##Diagnostic plots 
+
+The same diagnostic plots can be run for the two conditions under analysis. Here HNRNPUdel/+ vs CTRL is showed as example
+```{r}
+#Diagnostic plots
+plotMA(res_notreat, ylim = c(-10,10))
+plotDispEsts(dds_notreat, ylim = c(1e-6,1e1))
+hist( res_notreat$pvalue, breaks=20, col="grey")
+#volcano plot
+plot(res_notreat$log2FoldChange, -log10(res$padj),pch=19,cex=0.3, xlab="Log2 FC", ylab="-log10(BH Adjusted P-value")
+plot(res_notreat$log2FoldChange, -log10(res$padj),pch=19,cex=0.3, xlab="Log2 FC", ylab="-log10 BH Adjusted P-value", col=ifelse(res$padj<0.05&abs(res$log2FoldChange)>0.58,"red","black"))
+
+cutoff=sort(res_notreat$padj)[20] #the 20th smallest value of res$padj
+sign.genes=which(res_notreat$padj <= cutoff)
+text(x=res_notreat$log2FoldChange[sign.genes] , y=-log10(res_notreat$pvalue[sign.genes]), label=row.names(res_notreat)[sign.genes], cex=0.5)
+
+
+#dendogram
+rld <- rlog(dds_notreat,blind=TRUE)
+dists <- dist(t(assay(rld)))
+plot(hclust(dists))
+#PCA
+rld$group <- factor(rld$group, c("CTRLD0", "ASDD0", "CTRLD5", "ASDD5",  "CTRLD28", "ASDD28"))
+plotPCA(rld,intgroup="group")+
+  theme_classic()
+
+#PCA
+rld$StatusCells <- factor(rld$StatusCells, c("CTRL", "ASD"))
+plotPCA(rld,intgroup="StatusCells")+
+  theme_classic()
+
+#heatmap
+library("genefilter")
+library("RColorBrewer")
+library("gplots")
+colnames(rld) <- paste(dds_notreat$group, dds_notreat$ReplicateNumber)
+topVarGenes <- head(order(rowVars(assay(rld)), decreasing = TRUE), 50)
+heatmap.2(assay(rld)[topVarGenes,], scale="row",
+          #c("CTRLD0", "ASDD0", "CTRLD5", "ASDD5"),
+          trace="none", 
+          dendogram="column",
+          col= colorRampPalette( rev(brewer.pal(9,"RdBu")))(255))
+```
+
+##Generation of ranked files for GSEA analysis
+
+Each "res_***" file was ranked by fold expression in order to generate the input file for the GSEA software.
+
+```{r}
+rnk <- data.frame(HGNC = res_base$hgnc_symbol, LC = res_base$log2FoldChange) #create dataframe with only HGNC names and fold expression
+head(rnk)
+
+rnk <- rnk[order(rnk$LC, decreasing = TRUE),] #rank list by fold expression
+rnk$HGNC[rnk$HGNC==""] <-NA #if some rows have a empty HGNC value, make it "NA"
+rnk <- rnk[complete.cases(rnk$HGNC),] #remove rows with NA in HGNC
+
+#save .rnk file to input in GSEA software (different files were generated, for each comparison of interest)
+write.table(rnk, file = "DEG_si28_HGNC.rnk", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+```
+

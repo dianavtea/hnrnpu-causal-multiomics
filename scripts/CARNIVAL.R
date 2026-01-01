@@ -19,11 +19,18 @@ source("assignPROGENyScores.r")
 source("generateTFList.r")
 source("carnival_visNetwork.r")
 
-tf_activitiesf <- read_csv("~/hnrnpu-causal-multiomics/processeddata/TFActivity_CARNIVALinputf.csv")
+#CollecTRI
+tf_activitiesf <- read.csv("~/hnrnpu-causal-multiomics/processeddata/TFActivity_CARNIVALinputf.csv", row.names =1)
 #656 rows/TFs, 2 col (TF and score)
 head(tf_activitiesf)
-PathwayActivity <- read_csv("~/hnrnpu-causal-multiomics/processeddata/PathwayActivity_CARNIVALinputf.csv")
+measObj <- as.numeric(tf_activitiesf$score)
+names(measObj) <- rownames(tf_activitiesf)
+
+#PROGENy
+PathwayActivity <- read.csv("~/hnrnpu-causal-multiomics/processeddata/PathwayActivity_CARNIVALinputf.csv", row.names=1)
 #14 rows and 2 columns
+weightObj <- as.numeric(PathwayActivity$score)
+names(weightObj) <- rownames(PathwayActivity)
 
 # creating OmniPath PKN scaffold
 
@@ -56,103 +63,98 @@ sif$target <- gsub(":", "_", sif$target)
 #save SIF
 write_tsv(sif, "~/hnrnpu-causal-multiomics/processeddata/omnipath_carnival.tsv")
 
-tf_vector <- tf_activitiesf %>%
-  dplyr::slice_max(abs(score), n = 50) %>%   # same as top = 50
-  tibble::column_to_rownames("TF") %>%
-  pull(score)
-head(tf_vector)
 
-progeny_vector <- PathwayActivity %>%
-  tibble::column_to_rownames("Pathway") %>%
-  pull(score)
-
-tf_activities_carnival <- data.frame(tf_activitiesf, stringsAsFactors = F)
-rownames(tf_activities_carnival) <- tf_activitiesf$TF #656 TFs
-tf_activities_carnival$TF <- NULL
-tfList = generateTFList(tf_activities_carnival, top=50, access_idx = 1)
-
-load(file = system.file("progenyMembers.RData",package="CARNIVAL"))
-
-PathwayActivity_carnival <- data.frame(PathwayActivity, stringsAsFactors = F)
-rownames(PathwayActivity_carnival) <- PathwayActivity_carnival$Pathway
-PathwayActivity_carnival$Pathway <- NULL
-progenylist = assignPROGENyScores(progeny = t(PathwayActivity_carnival), 
-                                  progenyMembers = progenyMembers, 
-                                  id = "gene", 
-                                  access_idx = 1)
-
-# get initial nodes
+#get initial nodes
 iniMTX = base::setdiff(sif$source, sif$target)
 iniciators = base::data.frame(base::matrix(data = NaN, nrow = 1, ncol = length(iniMTX)), stringsAsFactors = F)
 colnames(iniciators) = iniMTX
 
-sum(names(tf_vector) %in% unique(c(sif$source, sif$target)))
+length(measObj) > 0
+length(weightObj) > 0
+unique(c(sif$source, sif$target))
 
-# run carnival
-carnival_result = runCARNIVAL( inputObj= iniciators,
-                               measObj = tfList$score, 
-                               netObj = sif, 
-                               weightObj = progenylist$score, 
-                               solverPath = "C:/Program Files/IBM/ILOG/CPLEX_Studio2211/cplex/bin/x64_win64/cplex.exe", 
-                               solver = "cplex",
-                               timelimit=7200,
-                               mipGAP=0,
-                               poolrelGAP=0 )
-
-#transoform to data.frame
-carnival_result$weightedSIF <- data.frame(carnival_result$weightedSIF, stringsAsFactors = F)
-carnival_result$weightedSIF$Sign <- as.numeric(carnival_result$weightedSIF$Sign)
-carnival_result$weightedSIF$Weight <- as.numeric(carnival_result$weightedSIF$Weight)
-
-carnival_result$nodesAttributes <- data.frame(carnival_result$nodesAttributes, stringsAsFactors = F)
-carnival_result$nodesAttributes$ZeroAct <- as.numeric(carnival_result$nodesAttributes$ZeroAct)
-carnival_result$nodesAttributes$UpAct <- as.numeric(carnival_result$nodesAttributes$UpAct)
-carnival_result$nodesAttributes$DownAct <- as.numeric(carnival_result$nodesAttributes$DownAct)
-carnival_result$nodesAttributes$AvgAct <- as.numeric(carnival_result$nodesAttributes$AvgAct)
-
-saveRDS(carnival_result,"~/hnrnpu-causal-multiomics/processeddata/carnival_result.rds")
-
-# visualization
-visNet = carnival_visNet(evis = carnival_result$weightedSIF,
-                         nvis = carnival_result$nodesAttributes)
-
-#visNet
-visSave(visNet, file = paste0('carnival_visualization_visNetwork.html'), selfcontained = TRUE)
-
-
-# ANALYSIS CARNIVAL results
-packageDescription("CARNIVAL")
-vignette("CARNIVAL")
-
-
-##### trial again adapted to carnival 2.20.0
-
-tf_measObj <- t(as.matrix(tf_vector))
-
-tf_measObj <- as.data.frame(tf_measObj)
-str(tf_measObj)
-head(tf_measObj)
-progeny_matrix <- t(as.matrix(progeny_vector))
-
-iniMTX = base::setdiff(sif$source, sif$target)
-iniciators = base::data.frame(base::matrix(data = NaN, nrow = 1, ncol = length(iniMTX)), stringsAsFactors = F)
-colnames(iniciators) = iniMTX
-
-
-sum(colnames(tf_measObj) %in% unique(c(sif$source, sif$target)))
-
-carnival_result <- runCARNIVAL(
-  inputObj  = iniciators,             # perturbation object
-  measObj   = tf_measObj,             # TF activity measurements
+carnival_result1 <- runCARNIVAL(
+  inputObj  = iniciators,             
+  measObj   = measObj,             # TF activity measurements
   netObj    = sif,                    # prior knowledge network
-  weightObj = progeny_vector,         # pathway activity scores (or progeny_matrix)
+  weightObj = weightObj,         # pathway activity scores (or progeny_matrix)
   solverPath = "C:/Program Files/IBM/ILOG/CPLEX_Studio2211/cplex/bin/x64_win64/cplex.exe", 
   solver     = "cplex",
   timelimit  = 7200, 
   mipGAP     = 0,
   poolrelGAP = 0
 )
-str(carnival_result)
+
+carnival_result_test0_05 <- runCARNIVAL(
+  inputObj  = iniciators,             
+  measObj   = measObj,             # TF activity measurements
+  netObj    = sif,                    # prior knowledge network
+  weightObj = weightObj,         # pathway activity scores (or progeny_matrix)
+  solverPath = "C:/Program Files/IBM/ILOG/CPLEX_Studio2211/cplex/bin/x64_win64/cplex.exe", 
+  solver     = "cplex",
+  timelimit  = 7200, 
+  mipGAP     = 0.05,
+)
+
+carnival_result_test02 <- runCARNIVAL(
+  inputObj  = iniciators,             
+  measObj   = measObj,             # TF activity measurements
+  netObj    = sif,                    # prior knowledge network
+  weightObj = weightObj,         # pathway activity scores (or progeny_matrix)
+  solverPath = "C:/Program Files/IBM/ILOG/CPLEX_Studio2211/cplex/bin/x64_win64/cplex.exe", 
+  solver     = "cplex",
+  timelimit  = 7200, 
+  mipGAP     = 0.2,
+)
+str(carnival_result1)
+#transform to data.frame
+carnival_result1$weightedSIF <- data.frame(carnival_result1$weightedSIF, stringsAsFactors = F)
+carnival_result1$weightedSIF$Sign <- as.numeric(carnival_result1$weightedSIF$Sign)
+carnival_result1$weightedSIF$Weight <- as.numeric(carnival_result1$weightedSIF$Weight)
+
+carnival_result1$nodesAttributes <- data.frame(carnival_result1$nodesAttributes, stringsAsFactors = F)
+carnival_result1$nodesAttributes$ZeroAct <- as.numeric(carnival_result1$nodesAttributes$ZeroAct)
+carnival_result1$nodesAttributes$UpAct <- as.numeric(carnival_result1$nodesAttributes$UpAct)
+carnival_result1$nodesAttributes$DownAct <- as.numeric(carnival_result1$nodesAttributes$DownAct)
+carnival_result1$nodesAttributes$AvgAct <- as.numeric(carnival_result1$nodesAttributes$AvgAct)
+
+saveRDS(carnival_result1,"~/hnrnpu-causal-multiomics/processeddata/carnival_result1.rds")
+
+# visualization
+visNet1 = carnival_visNet(evis = carnival_result1$weightedSIF,
+                         nvis = carnival_result1$nodesAttributes)
+carnival_result1 <- readRDS("~/hnrnpu-causal-multiomics/processeddata/carnival_result1.rds")
+#visNet
+visSave(visNet1, file = paste0('carnival_visualization_visNetwork1.html'), selfcontained = TRUE)
+?carnival_visNet
+View(carnival_result1$weightedSIF)
+View(carnival_result_test02$weightedSIF)
+
+
+# 0.2 mipgap
+str(carnival_result_test02)
+#transform to data.frame
+carnival_result_test02$weightedSIF <- data.frame(carnival_result_test02$weightedSIF, stringsAsFactors = F)
+carnival_result_test02$weightedSIF$Sign <- as.numeric(carnival_result_test02$weightedSIF$Sign)
+carnival_result_test02$weightedSIF$Weight <- as.numeric(carnival_result_test02$weightedSIF$Weight)
+
+carnival_result_test02$nodesAttributes <- data.frame(carnival_result_test02$nodesAttributes, stringsAsFactors = F)
+carnival_result_test02$nodesAttributes$ZeroAct <- as.numeric(carnival_result_test02$nodesAttributes$ZeroAct)
+carnival_result_test02$nodesAttributes$UpAct <- as.numeric(carnival_result_test02$nodesAttributes$UpAct)
+carnival_result_test02$nodesAttributes$DownAct <- as.numeric(carnival_result_test02$nodesAttributes$DownAct)
+carnival_result_test02$nodesAttributes$AvgAct <- as.numeric(carnival_result_test02$nodesAttributes$AvgAct)
+
+saveRDS(carnival_result_test02,"~/hnrnpu-causal-multiomics/processeddata/carnival_result_test02.rds")
+readRDS("~/hnrnpu-causal-multiomics/processeddata/carnival_result_test02.rds")
+carnival_result_test02 <- readRDS("~/hnrnpu-causal-multiomics/processeddata/carnival_result_test02.rds")
+
+# visualization
+visNet2 = carnival_visNet(evis = carnival_result_test02$weightedSIF,
+                          nvis = carnival_result_test02$nodesAttributes)
+
+#visNet
+visSave(visNet2, file = paste0('carnival_visualization_visNetwork2.html'), selfcontained = TRUE)
+
 
 # ANALYSIS
 library(readr)
@@ -281,3 +283,122 @@ sig_pathways_df <- as.data.frame(sig_pathways$resTab)  %>%
   tibble::rownames_to_column(var = "pathway")
 
 #gsc_brain
+
+
+##### tutorial
+# Load pathways
+pathways = gmt_to_csv("~/hnrnpu-causal-multiomics/c2.cp.v2025.1.Hs.symbols.gmt")
+
+# Extract nodes and background
+nodes_carnival = extractCARNIVALnodes(carnival_result_test02)
+
+# Run GSA hyper Geometric test
+sig_pathways <- runGSAhyper(genes = nodes_carnival$sucesses, 
+                            universe = nodes_carnival$bg, gsc = loadGSC(pathways))
+sig_pathways_df <- as.data.frame(sig_pathways$resTab)  %>% 
+  tibble::rownames_to_column(var = "pathway") 
+
+length(nodes_carnival$sucesses)
+length(nodes_carnival$bg)
+identical(sort(nodes_carnival$sucesses), sort(nodes_carnival$bg))
+
+#data for plotting
+library(dplyr)
+
+PathwaysSelect <- sig_pathways_df %>%
+  select(pathway, `p-value`, `Adjusted p-value`) %>%      # backticks for special names
+  filter(`Adjusted p-value` <= 0.05) %>%                 # use backticks, no quotes
+  rename(pvalue = `p-value`, AdjPvalue = `Adjusted p-value`) %>% 
+  mutate(pathway = as.factor(pathway))                   # no quotes around pathway
+
+PathwaysSelect <- data.frame(t(apply(PathwaysSelect, 1, function(r){
+  aux = unlist(strsplit( sub("_",";", r["pathway"]), ";" ))
+  r["pathway"] = gsub("_", " ", aux[2])
+  return(c(r, "source" = aux[1]))
+})))
+
+colnames(PathwaysSelect) = c("pathway", "pvalue", "AdjPvalu", "source")
+PathwaysSelect$AdjPvalu = as.numeric(PathwaysSelect$AdjPvalu)
+
+ggdata = PathwaysSelect %>% 
+  dplyr::filter(AdjPvalu <= 0.05) %>% 
+  dplyr::group_by(source) %>% 
+  dplyr::arrange(AdjPvalu) %>%
+  dplyr::slice(1:5)
+
+
+# Visualize top results
+ggplot(ggdata, aes(y = reorder(pathway, AdjPvalu), x = -log10(AdjPvalu)), color = source) + 
+  geom_bar(stat = "identity") +
+  facet_grid(source ~ ., scales="free_y") +
+  scale_x_continuous(
+    expand = c(0.01, 0.01),
+    limits = c(0, ceiling(max(-log10(PathwaysSelect$AdjPvalu)))),
+    breaks = seq(floor(min(-log10(PathwaysSelect$AdjPvalu))), ceiling(max(-log10(PathwaysSelect$AdjPvalu))), 1),
+    labels = math_format(10^-.x)
+  ) +
+  annotation_logticks(sides = "bt") +
+  theme_bw() +
+  theme(axis.title = element_text(face = "bold", size = 12),
+        axis.text.y = element_text(size = 6)) +
+  ylab("")
+
+
+##### trial 2
+##### tutorial
+# Load pathways
+pathways = gmt_to_csv("~/hnrnpu-causal-multiomics/c2.cp.v2025.1.Hs.symbols.gmt")
+
+# Extract nodes and background
+nodes_carnival2 = extractCARNIVALnodes(carnival_result_test02)
+
+# Run GSA hyper Geometric test
+sig_pathways <- runGSAhyper(genes = nodes_carnival2$sucesses, 
+                            universe = nodes_carnival2$bg, gsc = loadGSC(pathways))
+sig_pathways_df <- as.data.frame(sig_pathways$resTab)  %>% 
+  tibble::rownames_to_column(var = "pathway") 
+
+length(nodes_carnival2$sucesses)
+length(nodes_carnival2$bg)
+identical(sort(nodes_carnival2$sucesses), sort(nodes_carnival2$bg))
+
+#data for plotting
+library(dplyr)
+
+PathwaysSelect <- sig_pathways_df %>%
+  select(pathway, `p-value`, `Adjusted p-value`) %>%      # backticks for special names
+  filter(`Adjusted p-value` <= 0.05) %>%                 # use backticks, no quotes
+  rename(pvalue = `p-value`, AdjPvalue = `Adjusted p-value`) %>% 
+  mutate(pathway = as.factor(pathway))                   # no quotes around pathway
+
+PathwaysSelect <- data.frame(t(apply(PathwaysSelect, 1, function(r){
+  aux = unlist(strsplit( sub("_",";", r["pathway"]), ";" ))
+  r["pathway"] = gsub("_", " ", aux[2])
+  return(c(r, "source" = aux[1]))
+})))
+
+colnames(PathwaysSelect) = c("pathway", "pvalue", "AdjPvalu", "source")
+PathwaysSelect$AdjPvalu = as.numeric(PathwaysSelect$AdjPvalu)
+
+ggdata = PathwaysSelect %>% 
+  dplyr::filter(AdjPvalu <= 0.05) %>% 
+  dplyr::group_by(source) %>% 
+  dplyr::arrange(AdjPvalu) %>%
+  dplyr::slice(1:5)
+
+
+# Visualize top results
+ggplot(ggdata, aes(y = reorder(pathway, AdjPvalu), x = -log10(AdjPvalu)), color = source) + 
+  geom_bar(stat = "identity") +
+  facet_grid(source ~ ., scales="free_y") +
+  scale_x_continuous(
+    expand = c(0.01, 0.01),
+    limits = c(0, ceiling(max(-log10(PathwaysSelect$AdjPvalu)))),
+    breaks = seq(floor(min(-log10(PathwaysSelect$AdjPvalu))), ceiling(max(-log10(PathwaysSelect$AdjPvalu))), 1),
+    labels = math_format(10^-.x)
+  ) +
+  annotation_logticks(sides = "bt") +
+  theme_bw() +
+  theme(axis.title = element_text(face = "bold", size = 12),
+        axis.text.y = element_text(size = 6)) +
+  ylab("")

@@ -9,10 +9,10 @@ library(pheatmap)
 library(readr)
 ## We read the normalised counts and the experimental design 
 Normalised_counts <- read_csv("~/hnrnpu-causal-multiomics/VST_progeny_filt.csv") #15116 obs
-Experimental_design <- read_csv("~/hnrnpu-causal-multiomics/targets.csv")
+Experimental_design <- read_csv("~/hnrnpu-causal-multiomics/processeddata/targets.csv")
 
 ## We read the results from the differential analysis. 
-DEGASDvsCTRL <- read_csv("DEG_allstatsf.csv") #17627 genes
+DEGASDvsCTRL <- read_csv("~/hnrnpu-causal-multiomics/processeddata/DEG_allstatsf.csv") #17627 genes
 
 head(Normalised_counts)
 colnames(Normalised_counts)[1] <- "gene"

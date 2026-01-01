@@ -1,4 +1,3 @@
-
 ##### 02.12.25 filtered set trial #####
 library(progeny)
 library(dorothea)
@@ -16,17 +15,11 @@ library(ggrepel)
 ## We also load the support functions
 source("support_functions.R")
 
-## We load Dorothea Regulons
-data(dorothea_hs, package = "dorothea")
-regulons <- dorothea_hs %>%
-  dplyr::filter(confidence %in% c("A", "B","C"))
 
-#many TFs so cannot clearly visualise all in same heatmap
 # first compute a TF activity enrichment analysis using stats from DA
 #select TFs whose activity varies with conditions under study
-?viper
-#Virtual Inference of Protein-activity by Enriched Regulon analysis
 
+#Virtual Inference of Protein-activity by Enriched Regulon analysis
 #CollecTRI is a comprehensive resource containing a curated collection of TFs and their transcriptional 
 #targets compiled from 12 different resources. 
 #This collection provides an increased coverage of transcription factors and a superior performance in 
@@ -38,7 +31,7 @@ net <- decoupleR::get_collectri(organism = 'human',
 net
 #reprocessed large scale TF regulon consensus, more up to date and broader coverage
 #We can also infer TF activities from the statistics of the DEGs between ASD and CTRL:
-# Run ulm
+
 tf_activities_statf <- decoupleR::run_viper(mat = DEGASDvsCTRL_matrix[, 'statistic', drop = FALSE], 
                                       net = net, 
                                       .source = 'source', 
@@ -109,7 +102,6 @@ tf_activities_countsf <- decoupleR::run_viper(
   verbose = FALSE
 )
 
-# Suppose tf_activities_stat_top25$source has the TFs you want
 top_tfs <- tf_activities_statf_top25$source
 
 # Filter and reshape
