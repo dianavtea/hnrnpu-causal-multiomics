@@ -500,4 +500,4 @@ head(PathwayActivity_CARNIVALinputD0only)
 write_csv(PathwayActivity_CARNIVALinputD0only, 
           "~/hnrnpu-causal-multiomics/processeddata/PathwayActivity_CARNIVALinputD0.csv")
 
-PathwayActivity_CARNIVALinputD28only
+

@@ -1,0 +1,14 @@
+read C:/Users/diana/OneDrive/Documents/hnrnpu-causal-multiomics/lpFile_t00_28_56d06_01_2026n83.lp
+set mip tolerances mipgap 0.05
+set mip pool relgap 0
+set mip pool replace 2
+set mip limits populate 500
+set mip pool capacity 100
+set mip pool intensity 4
+set timelimit 900
+set threads 0
+set output clonelog -1
+set workdir C:/Users/diana/OneDrive/Documents/hnrnpu-causal-multiomics
+populate
+write C:/Users/diana/OneDrive/Documents/hnrnpu-causal-multiomics/result_t00_28_56d06_01_2026n83.txt sol all
+quit

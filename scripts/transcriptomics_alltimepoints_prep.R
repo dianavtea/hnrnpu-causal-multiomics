@@ -1,7 +1,8 @@
+##### libraries #####
 library(dplyr)
 library(DESeq2)
-##### RNAseq data prep #####
 
+##### RNAseq data prep #####
 merged_gene_counts_all <- as.data.frame(
   read.delim("~/hnrnpu-causal-multiomics/rawdata/bulkRNAseq/Complete_merged_gene_counts_more20count.txt", header=TRUE, sep = ',', stringsAsFactors = FALSE,row.names=1))
 #21262 transcripts
@@ -44,6 +45,8 @@ dds <- DESeqDataSetFromMatrix(countData = counts_filtered,
 dds <- DESeq(dds)
 resultsNames(dds)
 saveRDS(dds, file="DEG_ASDvsCTRL.rds")
+dds <- readRDS("DEG_ASDvsCTRL.rds")
+
 #ASD vs CTRL at D0
 resD0 <- results(dds, name = "condition_HNRNPUdel_vs_CTRL")
 head(resD0)
@@ -108,6 +111,7 @@ colnames(res_D28_only.annot)[colnames(res_D28_only.annot) == "hgnc_symbol"]   <-
 head(res_D28_only.annot)
 #write.csv(res_D28_only.annot, "DESeq2_res_D28_only.csv", row.names = FALSE)
 
+#17017
 res_D28only_clean <- res_D28_only.annot %>%
   dplyr::filter(!is.na(hgnc_symbol), hgnc_symbol != "") %>%
   dplyr::arrange(desc(abs(stat))) %>%   
@@ -124,7 +128,7 @@ res_D28only_clean <- res_D28_only.annot %>%
 #res_D28only_clean <- res_D28only_clean[!duplicated(res_D28only_clean$hgnc_symbol), ]
 
 write.csv(res_D28only_clean, "DESeq2_res_D28only_unique.csv", row.names = FALSE) #for CARNIVAL
-
+res_D28only_clean <- read.csv("DESeq2_res_D28only_unique.csv")
 ###### VST ######
 vst_all <- vst(dds, blind = FALSE)
 vstD28only <- vst_all[, colData(dds)$Day == "D28"]
@@ -173,11 +177,11 @@ dim(vst_D28only_clean)                       # Should match rows in res_clean
 head(vst_D28only_clean) #102102
 # Save for PROGENy
 write.csv(vst_D28only_clean, "~/hnrnpu-causal-multiomics/processeddata/vst_progD28only_clean.csv", row.names = TRUE)
-
+vst_D28only_clean <- read.csv("~/hnrnpu-causal-multiomics/processeddata/vst_progD28only_clean.csv")
 vstD28only_annot <- cbind(res_D28only_clean[, c("ensembl", "entrez", "hgnc_symbol")], vst_D28only_clean)
 head(vstD28only_annot)
 write.csv(vstD28only_annot, "VSTcounts_annot_D28only.csv", row.names = FALSE)
-
+vstD28only_annot <- read.csv("VSTcounts_annot_D28only.csv")
 ##### D28 vs D0  #####
 ##### D5 only #####
 #Connect to GRCh37 Ensembl - annotations
@@ -233,7 +237,7 @@ res_D5only_clean <- res_D5_only.annot %>%
 #res_D5only_clean <- res_D5only_clean[!duplicated(res_D5only_clean$hgnc_symbol), ]
 
 write.csv(res_D5only_clean, "DESeq2_res_D5only_unique.csv", row.names = FALSE) #for CARNIVAL
-
+res_D5only_clean <- read.csv("DESeq2_res_D5only_unique.csv")
 ###### VST ######
 vst_all <- vst(dds, blind = FALSE)
 vstD5only <- vst_all[, colData(dds)$Day == "D5"]
@@ -282,11 +286,12 @@ dim(vst_D5only_clean)                       # Should match rows in res_clean
 head(vst_D5only_clean) #102102
 # Save for PROGENy
 write.csv(vst_D5only_clean, "~/hnrnpu-causal-multiomics/processeddata/vst_progD5only_clean.csv", row.names = TRUE)
+vst_D5only_clean <- read.csv("~/hnrnpu-causal-multiomics/processeddata/vst_progD5only_clean.csv")
 
 vstD5only_annot <- cbind(res_D5only_clean[, c("ensembl", "entrez", "hgnc_symbol")], vst_D5only_clean)
 head(vstD5only_annot)
 write.csv(vstD5only_annot, "VSTcounts_annot_D5only.csv", row.names = FALSE)
-
+vstD5only_annot <- read.csv("VSTcounts_annot_D5only.csv")
 ##### D5 vs D0 #####
 ##### D0 #####
 #Connect to GRCh37 Ensembl - annotations
@@ -341,12 +346,12 @@ resD0_clean <- resD0.annot %>%
 #resD0_clean <- resD0_clean[!duplicated(resD0_clean$hgnc_symbol), ]
 
 write.csv(resD0_clean, "DESeq2_res_D0only_unique.csv", row.names = FALSE) #for CARNIVAL
-
+resD0_clean <- read.csv("DESeq2_res_D0only_unique.csv")
 ###### VST ######
 vst_all <- vst(dds, blind = FALSE)
 vstD0 <- vst_all[, colData(dds)$Day == "D0"]
-vstmatD0 <- assay(vstD0) #127572 elements
-dim(vstmatD0) #21262 transcripts x 6 samples
+vstmatD0 <- assay(vstD0) #21620 elements
+dim(vstmatD0) #21262 transcripts x 10 samples
 
 plotPCA(vstD0, intgroup = "condition")
 #73% variance explained in PC1, 18% in PC2, distinction between ASD and CTRL groups
@@ -390,8 +395,9 @@ dim(vst_D0_clean)                       # Should match rows in res_clean
 head(vst_D0_clean) #102102
 # Save for PROGENy
 write.csv(vst_D0_clean, "~/hnrnpu-causal-multiomics/processeddata/vst_progD0_clean.csv", row.names = TRUE)
+vst_D0_clean <- read.csv("~/hnrnpu-causal-multiomics/processeddata/vst_progD0_clean.csv")
 
 vstD0_annot <- cbind(resD0_clean[, c("ensembl", "entrez", "hgnc_symbol")], vst_D0_clean)
 head(vstD0_annot)
 write.csv(vstD0_annot, "VSTcounts_annot_D0.csv", row.names = FALSE)
-
+vstD0_annot <- read.csv("VSTcounts_annot_D0.csv")

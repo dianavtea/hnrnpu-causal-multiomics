@@ -208,3 +208,50 @@ layoutNetwork(layout.name = "force-directed")
 
 # Optional: If you have yFiles installed
 layoutNetwork(layout.name = "yfiles-organic")
+
+##### CARNIVAL ATTEMPTS 07.01.26 #####
+# Extract the Node Attributes
+nodesd5top30 <- carnival_D5top30$nodesAttributes
+
+# Filter for nodes that act as initiators (Activity inferred as 1 or -1)
+# Note: In your inputs, initiators were nodes with no upstream parents in the network
+inferred_driversd5 <- nodesd5top30 %>%
+  filter(Node %in% colnames(iniciators)) %>% # Filter only the nodes you provided as potential starts
+  filter(AvgAct != 0) %>% # Keep only those CARNIVAL found to be active
+  arrange(desc(abs(AvgAct))) # Sort by activity strength
+
+print(inferred_driversd5)
+
+library(igraph)
+
+# 1. Create an igraph object from your clean edges
+# (Using the clean_edgesD5_30 you created earlier)
+net_igraphd5 <- graph_from_data_frame(d = clean_edgesD5_30, directed = TRUE)
+
+# 2. Calculate "Betweenness Centrality" (Who controls the flow?)
+node_betweennessd5 <- betweenness(net_igraphd5, directed = TRUE)
+top_hubsd5 <- sort(node_betweennessd5, decreasing = TRUE)[1:10]
+
+# 3. Calculate "Degree" (Who has the most connections?)
+node_degreed5 <- degree(net_igraphd5, mode = "all")
+top_connectedd5 <- sort(node_degreed5, decreasing = TRUE)[1:10]
+
+print(top_hubsd5)
+
+BiocManager::install("clusterProfiler")
+library(clusterProfiler)
+library(org.Hs.eg.db) # Assuming human data
+
+# Convert symbols to Entrez IDs for the tool
+gene_list <- clean_nodesD5_30$Node
+gene.df <- bitr(gene_list, fromType = "SYMBOL",
+                toType = c("ENTREZID"),
+                OrgDb = org.Hs.eg.db)
+
+# Run KEGG Enrichment
+kegg_res <- enrichKEGG(gene = gene.df$ENTREZID,
+                       organism = 'hsa',
+                       pvalueCutoff = 0.05)
+
+# Visualize
+dotplot(kegg_res, showCategory=15)
