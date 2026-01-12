@@ -1,3 +1,4 @@
+#####libraries#####
 library(progeny)
 library(dorothea)
 library(tibble)
@@ -25,7 +26,7 @@ head(resD0.mat)
 resD0.num <- resD0.mat$stat
 names(resD0.num) <- resD0.mat$ID
 resD0.num <- resD0.num[!is.na(resD0.num)]
-any(is.na(resD0.num))
+any(is.na(resD0.num)) #FALSE
 head(resD0.num)
 
 TFscores_D0 <- decoupleR::run_viper(
@@ -49,88 +50,6 @@ TFscoresD0 <- TFscoresD0 %>%
   as.matrix()
 head(TFscoresD0)
 write.csv(TFscoresD0, "~/hnrnpu-causal-multiomics/processeddata/TFscoresD0.csv", row.names = TRUE) #280
-
-n_tfs <- 25
-
-library(dplyr)
-## top 25 TF in general (abs)
-# Filter for top 25 most active TFs (by absolute score)
-top_tfsD0 <- TFscores_D0 %>%
-  arrange(desc(abs(score))) %>%
-  slice_head(n = 25)
-
-# Plot them directly 
-top25allD0 <- ggplot(top_tfsD0, aes(x = reorder(source, score), y = score, fill = score > 0)) +
-  geom_col() +
-  coord_flip() + # Makes it horizontal
-  theme_minimal() +
-  labs(title = "Top 25 TF Activities (ASD vs CTRL)", 
-       y = "Normalized Enrichment Score (NES)", 
-       x = "Transcription Factor") +
-  scale_fill_manual(values = c("TRUE" = "#E41A1C", "FALSE" = "#377EB8"), 
-                    labels = c("Activated", "Inhibited"),
-                    name = "Status")
-
-ggsave(
-  filename = "top25abs_D0.png",      # use PDF or PNG
-  plot = top25allD0,           
-  width = 8, height = 10,          # size in inches
-  dpi = 300                       # resolution for PNG (ignored for PDF)
-)
-
-##top 15 for activated and top 15 for inhibited TFs
-# Select Top 15 Activated (Highest Positive Scores)
-top_up <- TFscores_D0 %>%
-  arrange(desc(score)) %>%
-  slice_head(n = 15)
-
-# Select Top 15 Inhibited (Lowest Negative Scores)
-top_down <- TFscores_D0 %>%
-  arrange(score) %>%
-  slice_head(n = 15)
-
-# Combine them into one dataframe
-top_30_balanced <- bind_rows(top_up, top_down)
-
-# We use reorder() to ensure they appear sorted by score, not alphabetically
-top30D0 <- ggplot(top_30_balanced, aes(x = reorder(source, score), y = score, fill = score > 0)) +
-  geom_col() +
-  coord_flip() + # Flips to horizontal bars for readability
-  theme_minimal() +
-  labs(title = "Top 15 Activated & Inhibited TFs",
-       subtitle = "Differential Analysis (ASD vs CTRL)",
-       x = "Transcription Factor",
-       y = "NES (Activity Score)",
-       fill = "Regulation") +
-  scale_fill_manual(values = c("TRUE" = "#E41A1C", "FALSE" = "#377EB8"), 
-                    labels = c("Inhibited", "Activated")) +
-  theme(
-    axis.text.y = element_text(size = 10), # Adjust text size if needed
-    legend.position = "top"
-  )
-
-ggsave(
-  filename = "top30TFs_D0.png",      # use PDF or PNG
-  plot = top30D0,           
-  width = 10, height = 8,          # size in inches
-  dpi = 300                       # resolution for PNG (ignored for PDF)
-)
-
-## For the volcano plot (related to support functions)
-library(ggrepel)
-## We also load the support functions
-source("support_functions.R")
-
-#To interpret the results, we can look at the expression of targets of one of the most deregulated TFs
-targets_ETS1 <- net$target[net$source == "ETS1"]
-DEG_ETS1 <- DED0only[DED0only$hgnc_symbol %in% targets_ETS1, ]
-volcano_nice(as.data.frame(DEG_ETS1), 
-             FCIndex = 3,     # log2FoldChange column
-             pValIndex = 7,   # padj column
-             IDIndex = 9,     # gene ID column
-             nlabels = 20, 
-             label = TRUE, 
-             straight = FALSE)
 
 ##### D5 #####
 ###### collectri ######
@@ -174,88 +93,6 @@ TFscoresD5 <- TFscoresD5 %>%
 head(TFscoresD5)
 write.csv(TFscoresD5, "~/hnrnpu-causal-multiomics/processeddata/TFscoresD5.csv", row.names = TRUE) #280
 
-n_tfs <- 25
-
-library(dplyr)
-## top 25 TF in general (abs)
-# Filter for top 25 most active TFs (by absolute score)
-top_tfsD5 <- TFscores_D5 %>%
-  arrange(desc(abs(score))) %>%
-  slice_head(n = 25)
-
-# Plot them directly 
-top25allD5 <- ggplot(top_tfsD5, aes(x = reorder(source, score), y = score, fill = score > 0)) +
-  geom_col() +
-  coord_flip() + # Makes it horizontal
-  theme_minimal() +
-  labs(title = "Top 25 TF Activities (ASD vs CTRL)", 
-       y = "Normalized Enrichment Score (NES)", 
-       x = "Transcription Factor") +
-  scale_fill_manual(values = c("TRUE" = "#E41A1C", "FALSE" = "#377EB8"), 
-                    labels = c("Activated", "Inhibited"),
-                    name = "Status")
-
-ggsave(
-  filename = "top25abs_D5.png",      # use PDF or PNG
-  plot = top25allD5,           
-  width = 8, height = 10,          # size in inches
-  dpi = 300                       # resolution for PNG (ignored for PDF)
-)
-
-##top 15 for activated and top 15 for inhibited TFs
-# Select Top 15 Activated (Highest Positive Scores)
-top_up <- TFscores_D5 %>%
-  arrange(desc(score)) %>%
-  slice_head(n = 15)
-
-# Select Top 15 Inhibited (Lowest Negative Scores)
-top_down <- TFscores_D5 %>%
-  arrange(score) %>%
-  slice_head(n = 15)
-
-# Combine them into one dataframe
-top_30_balanced <- bind_rows(top_up, top_down)
-
-# We use reorder() to ensure they appear sorted by score, not alphabetically
-top30D5 <- ggplot(top_30_balanced, aes(x = reorder(source, score), y = score, fill = score > 0)) +
-  geom_col() +
-  coord_flip() + # Flips to horizontal bars for readability
-  theme_minimal() +
-  labs(title = "Top 15 Activated & Inhibited TFs",
-       subtitle = "Differential Analysis (ASD vs CTRL)",
-       x = "Transcription Factor",
-       y = "NES (Activity Score)",
-       fill = "Regulation") +
-  scale_fill_manual(values = c("TRUE" = "#E41A1C", "FALSE" = "#377EB8"), 
-                    labels = c("Inhibited", "Activated")) +
-  theme(
-    axis.text.y = element_text(size = 10), # Adjust text size if needed
-    legend.position = "top"
-  )
-
-ggsave(
-  filename = "top30TFs_D5.png",      # use PDF or PNG
-  plot = top30D5,           
-  width = 10, height = 8,          # size in inches
-  dpi = 300                       # resolution for PNG (ignored for PDF)
-)
-
-## For the volcano plot (related to support functions)
-library(ggrepel)
-## We also load the support functions
-source("support_functions.R")
-
-#To interpret the results, we can look at the expression of targets of one of the most deregulated TFs
-targets_SP1 <- net$target[net$source == "SP1"]
-DEG_SP1 <- DED5only[DED5only$hgnc_symbol %in% targets_SP1, ]
-volcano_nice(as.data.frame(DEG_SP1), 
-             FCIndex = 3,     # log2FoldChange column
-             pValIndex = 7,   # padj column
-             IDIndex = 9,     # gene ID column
-             nlabels = 20, 
-             label = TRUE, 
-             straight = FALSE)
-
 ##### D28 #####
 ###### collectri ######
 net <- decoupleR::get_collectri(organism='human', split_complexes=FALSE)
@@ -298,115 +135,70 @@ TFscoresD28 <- TFscoresD28 %>%
 head(TFscoresD28)
 write.csv(TFscoresD28, "~/hnrnpu-causal-multiomics/processeddata/TFscoresD28.csv", row.names = TRUE) #280
 
-n_tfs <- 25
+##### TF dot plot #####
+library(tidyverse)
 
-library(dplyr)
-## top 25 TF in general (abs)
-# Filter for top 25 most active TFs (by absolute score)
-top_tfsD28 <- TFscores_D28 %>%
+top10_D0 <- TFscores_D0 %>%
   arrange(desc(abs(score))) %>%
-  slice_head(n = 25)
+  slice_head(n = 10)
+head(top10_D0)
 
-# Plot them directly 
-top25allD28 <- ggplot(top_tfsD28, aes(x = reorder(source, score), y = score, fill = score > 0)) +
-  geom_col() +
-  coord_flip() + # Makes it horizontal
-  theme_minimal() +
-  labs(title = "Top 25 TF Activities (ASD vs CTRL)", 
-       y = "Normalized Enrichment Score (NES)", 
-       x = "Transcription Factor") +
-  scale_fill_manual(values = c("TRUE" = "#E41A1C", "FALSE" = "#377EB8"), 
-                    labels = c("Activated", "Inhibited"),
-                    name = "Status")
+top10_D0 <- top10_D0 %>%
+  dplyr::select(TF = source, score, p_value) %>%
+  dplyr::mutate(timepoint = "D0")
 
-ggsave(
-  filename = "top25abs_D28.png",      # use PDF or PNG
-  plot = top25allD28,           
-  width = 8, height = 10,          # size in inches
-  dpi = 300                       # resolution for PNG (ignored for PDF)
-)
+top10_D5 <- TFscores_D5 %>%
+  arrange(desc(abs(score))) %>%
+  slice_head(n = 10)
+head(top10_D5)
 
-##top 15 for activated and top 15 for inhibited TFs
-# Select Top 15 Activated (Highest Positive Scores)
-top_up <- TFscores_D28 %>%
-  arrange(desc(score)) %>%
-  slice_head(n = 15)
+top10_D5 <- top10_D5 %>%
+  dplyr::select(TF = source, score, p_value) %>%
+  dplyr::mutate(timepoint = "D5")
 
-# Select Top 15 Inhibited (Lowest Negative Scores)
-top_down <- TFscores_D28 %>%
-  arrange(score) %>%
-  slice_head(n = 15)
+top10_D28 <- TFscores_D28 %>%
+  arrange(desc(abs(score))) %>%
+  slice_head(n = 10)
+head(top10_D28)
 
-# Combine them into one dataframe
-top_30_balanced <- bind_rows(top_up, top_down)
+top10_D28 <- top10_D28 %>%
+  dplyr::select(TF = source, score, p_value) %>%
+  dplyr::mutate(timepoint = "D28")
 
-# We use reorder() to ensure they appear sorted by score, not alphabetically
-top30D28 <- ggplot(top_30_balanced, aes(x = reorder(source, score), y = score, fill = score > 0)) +
-  geom_col() +
-  coord_flip() + # Flips to horizontal bars for readability
-  theme_minimal() +
-  labs(title = "Top 15 Activated & Inhibited TFs",
-       subtitle = "Differential Analysis (ASD vs CTRL)",
-       x = "Transcription Factor",
-       y = "NES (Activity Score)",
-       fill = "Regulation") +
-  scale_fill_manual(values = c("TRUE" = "#E41A1C", "FALSE" = "#377EB8"), 
-                    labels = c("Inhibited", "Activated")) +
+# Combine them into one large dataframe
+df_all <- bind_rows(top10_D0, top10_D5, top10_D28)
+
+df_plot <- df_all %>%
+  # Create the inverse P-value score for dot size
+  # We use -log10 so that smaller P-values become larger numbers
+  dplyr::mutate(log_p = -log10(p_value)) %>%
+  
+  # Ensure the timepoints appear in the correct chronological order (not alphabetical)
+  dplyr::mutate(timepoint = factor(timepoint, levels = c("D0", "D5", "D28")))
+
+limit <- max(abs(df_plot$score)) * c(-1, 1)
+
+TFplot <- ggplot(df_plot, aes(x = timepoint, y = reorder(TF, score))) +
+  geom_point(aes(color = score, size = log_p)) +
+  scale_color_gradientn(
+    colors = my_colors,
+    limits = limit,    # Forces 0 to be the exact center
+    name = "Activity\nScore"
+  ) +
+  scale_size_continuous(
+    name = "-log10(P-val)",
+    range = c(5, 10) # Adjust these numbers to make dots bigger/smaller
+  ) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Differential TF Activity (decoupleR)",
+    x = "Timepoint",
+    y = "Transcription Factor"
+  ) +
   theme(
-    axis.text.y = element_text(size = 10), # Adjust text size if needed
-    legend.position = "top"
+    panel.grid = element_blank(),
+    axis.text.y = element_text(size = 10), 
+    panel.grid.major.x = element_blank()  # Clean up vertical grid lines
   )
 
-ggsave(
-  filename = "top30TFs_D28.png",      # use PDF or PNG
-  plot = top30D28,           
-  width = 10, height = 8,          # size in inches
-  dpi = 300                       # resolution for PNG (ignored for PDF)
-)
-
-## For the volcano plot (related to support functions)
-library(ggrepel)
-## We also load the support functions
-source("support_functions.R")
-
-#To interpret the results, we can look at the expression of targets of one of the most deregulated TFs
-targets_SP1 <- net$target[net$source == "SP1"]
-DEG_SP1 <- DED28only[DED28only$hgnc_symbol %in% targets_SP1, ]
-volcano_nice(as.data.frame(DEG_SP1), 
-             FCIndex = 3,     # log2FoldChange column
-             pValIndex = 7,   # padj column
-             IDIndex = 9,     # gene ID column
-             nlabels = 20, 
-             label = TRUE, 
-             straight = FALSE)
-
-
-###### OPTIONAL #######
-#ALT way of representing TFs
-tf_activities_statf_top25 <- TFscores_D0 %>%
-  as.data.frame() %>% 
-  dplyr::filter(p_value < 0.05) %>%  # optional: only significant TFs
-  dplyr::top_n(25, wt = abs(score)) %>%
-  dplyr::arrange(score) %>% 
-  dplyr::mutate(source = factor(source, levels = unique(source)))
-
-contrast_tftop25f <- ggplot(tf_activities_statf_top25,aes(x = reorder(source, score), y = score)) + 
-  geom_bar(aes(fill = score), stat = "identity") +
-  scale_fill_gradient2(low = "darkblue", high = "indianred", 
-                       mid = "whitesmoke", midpoint = 0) + 
-  theme_minimal() +
-  theme(axis.title = element_text(face = "bold", size = 12),
-        axis.text.x = 
-          element_text(angle = 45, hjust = 1, size =10, face= "bold"),
-        axis.text.y = element_text(size =10, face= "bold"),
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank()) +
-  xlab("Transcription Factors")
-
-ggsave(
-  filename = "barplot_top25tfscores.png",
-  plot = contrast_tftop25f,
-  width = 12,
-  height = 8,
-  dpi = 300
-)
+ggsave("TFdotplot.png", width = 8, height = 10, dpi = 300)
