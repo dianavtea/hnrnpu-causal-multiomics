@@ -2,7 +2,7 @@
 
 This repository contains code and analysis to infer causal network from transcriptomics in HNRNPU deletion cell models using CARNIVAL.
 
-To reproduce code you can follow transcriptomics_alltimepoints > pathwayactivities > TFactivities > CARNIVALanalysis
+To reproduce code you can follow scripts > transcriptomics_alltimepoints > pathwayactivities > TFactivities > CARNIVALanalysis
 
 Cell lines:
 HNRNPUdelD28 vs CTRL9D28
